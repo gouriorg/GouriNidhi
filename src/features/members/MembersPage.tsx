@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { PhoneIcon, PlusIcon, SearchIcon, UsersIcon } from 'lucide-react'
+import { PhoneIcon, PlusIcon, SearchIcon, UploadIcon, UsersIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { BulkImportDialog } from '@/features/bulkImport/BulkImportDialog'
+import { TemplateDownloadButton } from '@/features/bulkImport/TemplateDownloadButton'
 import { MemberFormDialog } from '@/features/members/MemberFormDialog'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import type { PersonStatus } from '@/types/entities'
@@ -25,6 +27,7 @@ export function MembersPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<PersonStatus | 'all'>('all')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const people = useLiveQuery(() => peopleRepository.list(), [])
 
@@ -47,9 +50,15 @@ export function MembersPage() {
         title="Members"
         description="Everyone who can join a scheme. Their mobile number is also their login."
         actions={
-          <Button onClick={() => setDialogOpen(true)}>
-            <PlusIcon /> Add member
-          </Button>
+          <>
+            <TemplateDownloadButton kind="members" />
+            <Button variant="outline" onClick={() => setUploadOpen(true)}>
+              <UploadIcon /> Upload
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <PlusIcon /> Add member
+            </Button>
+          </>
         }
       />
 
@@ -87,9 +96,15 @@ export function MembersPage() {
           title="No members yet"
           description="Add the people who will take part in your chit schemes. You only need a name and a mobile number."
           action={
-            <Button onClick={() => setDialogOpen(true)}>
-              <PlusIcon /> Add your first member
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <TemplateDownloadButton kind="members" />
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                <UploadIcon /> Upload
+              </Button>
+              <Button onClick={() => setDialogOpen(true)}>
+                <PlusIcon /> Add your first member
+              </Button>
+            </div>
           }
         />
       ) : filtered.length === 0 ? (
@@ -164,6 +179,13 @@ export function MembersPage() {
       )}
 
       <MemberFormDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <BulkImportDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        kind="members"
+        existingNames={(people ?? []).map((person) => person.fullName)}
+        existingMobiles={(people ?? []).map((person) => person.mobile)}
+      />
     </>
   )
 }

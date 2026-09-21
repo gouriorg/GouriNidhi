@@ -22,7 +22,7 @@ export const schemeStatusLabels: Record<SchemeStatus, string> = {
   draft: 'Draft',
   active: 'Active',
   completed: 'Completed',
-  cancelled: 'Cancelled',
+  cancelled: 'Inactive',
 }
 
 export const roundStatusLabels: Record<RoundStatus, string> = {

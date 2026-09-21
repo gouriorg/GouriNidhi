@@ -96,7 +96,6 @@ export async function loadSampleData(): Promise<{
   })
 
   const scheme = await schemesRepository.create({
-    code: 'GN-SAMPLE',
     name: 'Sample Family Chit',
     description: 'Dev sample data. Safe to delete from Settings.',
     monthlyAmount,

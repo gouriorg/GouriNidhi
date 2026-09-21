@@ -16,10 +16,7 @@ export function toCsv(headers: string[], rows: unknown[][]): string {
   return lines.join('\r\n')
 }
 
-/** Trigger a browser download of text content. */
-export function downloadTextFile(filename: string, content: string, mime = 'text/csv') {
-  // BOM so Excel opens ₹ and Indian names correctly.
-  const blob = new Blob([`\uFEFF${content}`], { type: `${mime};charset=utf-8` })
+function clickDownload(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -28,4 +25,16 @@ export function downloadTextFile(filename: string, content: string, mime = 'text
   anchor.click()
   document.body.removeChild(anchor)
   URL.revokeObjectURL(url)
+}
+
+/** Trigger a browser download of text content. */
+export function downloadTextFile(filename: string, content: string, mime = 'text/csv') {
+  // BOM so Excel opens ₹ and Indian names correctly.
+  clickDownload(filename, new Blob([`\uFEFF${content}`], { type: `${mime};charset=utf-8` }))
+}
+
+export function downloadBytes(filename: string, bytes: Uint8Array, mime: string) {
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  clickDownload(filename, new Blob([copy], { type: mime }))
 }

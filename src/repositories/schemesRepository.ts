@@ -3,6 +3,7 @@ import { buildFixedProfitSchedule } from '@/domain/distribution/fixedProfitSched
 import { generateRoundsForScheme } from '@/domain/rounds/generateRounds'
 import { newId, nowIso } from '@/lib/id'
 import { mapScheme, roundToRow, schemeToRow, throwIfError } from '@/lib/mappers'
+import { nextGnSchemeCode } from '@/lib/schemeCode'
 import { getSupabase } from '@/lib/supabase'
 import { auditService } from '@/services/audit'
 import { notifyDataChanged } from '@/stores/dataVersion'
@@ -11,7 +12,6 @@ import type { Paise } from '@/domain/money/money'
 import type { DateOnly, Scheme, SchemeStatus } from '@/types/entities'
 
 export type SchemeInput = {
-  code: string
   name: string
   description?: string
   monthlyAmount: Paise
@@ -31,7 +31,7 @@ export function isReadOnly(scheme: Scheme): boolean {
   return scheme.status === 'completed' || scheme.status === 'cancelled'
 }
 
-function buildSnapshot(input: Omit<SchemeInput, 'code' | 'name'>) {
+function buildSnapshot(input: Omit<SchemeInput, 'name'>) {
   return buildFixedProfitSchedule({
     maxMembers: input.maxMembers,
     monthlyAmount: input.monthlyAmount,
@@ -65,42 +65,52 @@ export const schemesRepository = {
     return data ? mapScheme(data) : undefined
   },
 
+  async allocateNextCode(): Promise<string> {
+    const existing = await schemesRepository.list()
+    return nextGnSchemeCode(existing.map((scheme) => scheme.code))
+  },
+
   async create(input: SchemeInput): Promise<Scheme> {
-    const code = input.code.trim().toUpperCase()
-    const clash = await schemesRepository.findByCode(code)
-    if (clash) throw new RepositoryError(`Scheme code ${code} is already used by "${clash.name}".`)
-
     const timestamp = nowIso()
-    const scheme = schemeSchema.parse({
-      id: newId(),
-      code,
-      name: input.name.trim(),
-      description: input.description?.trim() || undefined,
-      monthlyAmount: input.monthlyAmount,
-      maxMembers: input.maxMembers,
-      durationMonths: input.durationMonths,
-      startDate: input.startDate,
-      collectionDay: input.collectionDay,
-      profitBps: input.profitBps,
-      distributionMode: 'fixed_profit',
-      scheduleSnapshot: buildSnapshot(input),
-      status: 'draft',
-      notes: input.notes?.trim() || undefined,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    } satisfies Scheme)
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const code = await schemesRepository.allocateNextCode()
+      const scheme = schemeSchema.parse({
+        id: newId(),
+        code,
+        name: input.name.trim(),
+        description: input.description?.trim() || undefined,
+        monthlyAmount: input.monthlyAmount,
+        maxMembers: input.maxMembers,
+        durationMonths: input.durationMonths,
+        startDate: input.startDate,
+        collectionDay: input.collectionDay,
+        profitBps: input.profitBps,
+        distributionMode: 'fixed_profit',
+        scheduleSnapshot: buildSnapshot(input),
+        status: 'draft',
+        notes: input.notes?.trim() || undefined,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      } satisfies Scheme)
 
-    const { error } = await getSupabase().from('schemes').insert(schemeToRow(scheme))
-    throwIfError(error)
-    await auditService.record({
-      action: 'scheme.created',
-      entityType: 'scheme',
-      entityId: scheme.id,
-      summary: `Created scheme ${scheme.code} — ${scheme.name}`,
-      after: scheme,
-    })
-    notifyDataChanged()
-    return scheme
+      const { error } = await getSupabase().from('schemes').insert(schemeToRow(scheme))
+      if (error) {
+        if (error.code === '23505') continue
+        throwIfError(error)
+      }
+
+      await auditService.record({
+        action: 'scheme.created',
+        entityType: 'scheme',
+        entityId: scheme.id,
+        summary: `Created scheme ${scheme.code} — ${scheme.name}`,
+        after: scheme,
+      })
+      notifyDataChanged()
+      return scheme
+    }
+
+    throw new RepositoryError('Could not allocate a unique scheme code. Try saving again.')
   },
 
   async update(id: string, input: Partial<SchemeInput>): Promise<Scheme> {
@@ -110,18 +120,9 @@ export const schemesRepository = {
       throw new RepositoryError(`A ${before.status} scheme cannot be edited. Only notes can change.`)
     }
 
-    const code = input.code === undefined ? before.code : input.code.trim().toUpperCase()
-    if (code !== before.code) {
-      const clash = await schemesRepository.findByCode(code)
-      if (clash && clash.id !== id) {
-        throw new RepositoryError(`Scheme code ${code} is already used by "${clash.name}".`)
-      }
-    }
-
     const locked = isFinancialsLocked(before)
     if (locked) {
       const frozen: (keyof SchemeInput)[] = [
-        'code',
         'monthlyAmount',
         'maxMembers',
         'durationMonths',
@@ -140,7 +141,6 @@ export const schemesRepository = {
 
     const merged: Scheme = {
       ...before,
-      code,
       name: input.name === undefined ? before.name : input.name.trim(),
       description:
         input.description === undefined ? before.description : input.description.trim() || undefined,
@@ -254,11 +254,37 @@ export const schemesRepository = {
       action: `scheme.${status}`,
       entityType: 'scheme',
       entityId: id,
-      summary: `Scheme ${before.code} marked ${status}`,
+      summary: `Scheme ${before.code} marked ${status === 'cancelled' ? 'inactive' : status}`,
       before,
       after: updated,
     })
     notifyDataChanged()
+  },
+
+  /** Soft-close a scheme. The row and all money history stay in the database. */
+  async deactivate(id: string): Promise<void> {
+    const before = await schemesRepository.get(id)
+    if (!before) throw new RepositoryError('Scheme not found')
+    if (before.status !== 'draft' && before.status !== 'active') {
+      throw new RepositoryError('Only a draft or active scheme can be deactivated.')
+    }
+    await schemesRepository.setStatus(id, 'cancelled')
+  },
+
+  /** Restore an inactive scheme. Returns draft if it never ran, otherwise active. */
+  async reactivate(id: string): Promise<SchemeStatus> {
+    const before = await schemesRepository.get(id)
+    if (!before) throw new RepositoryError('Scheme not found')
+    if (before.status !== 'cancelled') {
+      throw new RepositoryError('Only an inactive scheme can be reactivated.')
+    }
+    const { count } = await getSupabase()
+      .from('rounds')
+      .select('*', { count: 'exact', head: true })
+      .eq('scheme_id', id)
+    const next: SchemeStatus = count && count > 0 ? 'active' : 'draft'
+    await schemesRepository.setStatus(id, next)
+    return next
   },
 
   async updateNotes(id: string, notes: string): Promise<void> {
