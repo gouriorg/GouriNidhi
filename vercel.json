@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "headers": [
+    {
+      "source": "/supabase.config.json",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, max-age=0" }]
+    }
+  ],
+  "rewrites": [
+    { "source": "/((?!supabase.config.json$).*)", "destination": "/index.html" }
+  ]
+}

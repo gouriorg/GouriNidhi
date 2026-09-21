@@ -1,0 +1,11 @@
+# GouriNidhi on Supabase
+project_id = "yjrtjddsfsoplcrbplfx"
+
+[api]
+enabled = true
+
+[functions.bootstrap-admin]
+verify_jwt = false
+
+[functions.member-admin]
+verify_jwt = true

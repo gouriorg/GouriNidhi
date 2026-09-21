@@ -1,0 +1,94 @@
+import { useLiveQuery } from '@/hooks/useLiveQuery'
+import { AlertTriangleIcon, ShieldIcon, UserIcon } from 'lucide-react'
+
+import { PageHeader } from '@/components/PageHeader'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ADMIN_CREDENTIALS, AUTH_WARNING } from '@/config/auth'
+import { peopleRepository } from '@/repositories/peopleRepository'
+
+/** Explains the two roles. There is deliberately no promote-to-admin action yet. */
+export function RolesPage() {
+  const memberCount = useLiveQuery(
+    () =>
+      peopleRepository.list().then((rows) => rows.filter((person) => person.status === 'active').length),
+    [],
+  )
+
+  return (
+    <>
+      <PageHeader
+        title="Roles"
+        description="GouriNidhi has exactly two roles today: the built-in Admin and everyone in the Members directory."
+      />
+
+      <div className="border-warning/35 bg-warning/10 text-warning-foreground mb-6 flex gap-2 rounded-lg border p-3 text-sm">
+        <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+        <p>{AUTH_WARNING}</p>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldIcon className="text-primary size-5" /> Admin
+              <Badge variant="muted">1 built-in login</Badge>
+            </CardTitle>
+            <CardDescription>
+              Signs in with the username <code className="font-mono">{ADMIN_CREDENTIALS.username}</code>.
+              This account is not a member record.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm">
+            <p className="font-medium">Can do everything:</p>
+            <ul className="text-muted-foreground list-disc space-y-1 pl-5">
+              <li>Add, edit and deactivate members</li>
+              <li>Create schemes and see every scheme&rsquo;s member list</li>
+              <li>Assign members to schemes and set payout recipients</li>
+              <li>Record contributions and payouts</li>
+              <li>Read reports, the audit log, and export or restore backups</li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserIcon className="text-primary size-5" /> Member
+              <Badge variant="muted">{memberCount ?? 0} active</Badge>
+            </CardTitle>
+            <CardDescription>
+              Everyone in the Members directory. They sign in with their 10-digit mobile number as
+              both the username and the password.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm">
+            <p className="font-medium">Sees only their own home page:</p>
+            <ul className="text-muted-foreground list-disc space-y-1 pl-5">
+              <li>Their profile, schemes, savings and payment history</li>
+              <li>Their own payout month and amount</li>
+              <li>The month-by-month payout curve, without any recipient names</li>
+            </ul>
+            <p className="mt-2 font-medium">Never sees:</p>
+            <ul className="text-muted-foreground list-disc space-y-1 pl-5">
+              <li>The Members directory or any scheme roster</li>
+              <li>Another member&rsquo;s name, mobile, address or money</li>
+              <li>Reports, the audit log, settings or backups</li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mt-5">
+        <CardHeader>
+          <CardTitle>Planned for later</CardTitle>
+          <CardDescription>
+            Additional roles such as Manager or Viewer, multiple admin accounts, and a properly
+            hashed password are intentionally left out of this version. Scheme membership carries no
+            extra role: every assigned person is simply a member of that scheme.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    </>
+  )
+}
