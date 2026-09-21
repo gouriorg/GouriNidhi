@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { LoadingState } from '@/components/EmptyState'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { MemberLayout } from '@/components/layout/MemberLayout'
+import { PublicLayout } from '@/components/layout/PublicLayout'
 import { RequireAdmin, RequireSession } from '@/app/guards'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
@@ -54,6 +55,15 @@ const AuditPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const ContactPage = lazy(() =>
+  import('@/features/site/ContactPage').then((m) => ({ default: m.ContactPage })),
+)
+const OrganizersPage = lazy(() =>
+  import('@/features/site/OrganizersPage').then((m) => ({ default: m.OrganizersPage })),
+)
+const TermsPage = lazy(() =>
+  import('@/features/site/TermsPage').then((m) => ({ default: m.TermsPage })),
+)
 
 /** Chunks load from the service worker cache offline, so this is brief. */
 function page(element: ReactNode) {
@@ -65,6 +75,15 @@ const router = createBrowserRouter([
     path: '/login',
     element: <LoginPage />,
     errorElement: <RouteErrorBoundary />,
+  },
+  {
+    element: <PublicLayout />,
+    errorElement: <RouteErrorBoundary />,
+    children: [
+      { path: '/contact', element: page(<ContactPage />) },
+      { path: '/organizers', element: page(<OrganizersPage />) },
+      { path: '/terms', element: page(<TermsPage />) },
+    ],
   },
   {
     element: <RequireSession />,

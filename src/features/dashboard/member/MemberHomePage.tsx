@@ -17,7 +17,10 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PayoutScheduleChart } from '@/features/schemes/PayoutScheduleChart'
 import { loadMemberHome } from '@/features/dashboard/member/memberHomeService'
+import { OrganizerAvatar } from '@/components/OrganizerAvatar'
 import { formatDisplayDate } from '@/lib/dates'
+import { organizersRepository } from '@/repositories/organizersRepository'
+import { siteContentRepository } from '@/repositories/siteContentRepository'
 import { useSession } from '@/stores/session'
 
 /**
@@ -78,6 +81,8 @@ export function MemberHomePage() {
           icon={TrophyIcon}
         />
       </div>
+
+      <OrganizersStrip />
 
       <Card>
         <CardHeader>
@@ -250,6 +255,31 @@ export function MemberHomePage() {
         Contact your scheme admin for any correction.
       </p>
     </div>
+  )
+}
+
+function OrganizersStrip() {
+  const people = useLiveQuery(() => siteContentRepository.listOrganizers(), [])
+  const photos = useLiveQuery(() => organizersRepository.listPhotos(), []) ?? {}
+  if (!people?.length) return null
+
+  return (
+    <section className="grid gap-3">
+      <h2 className="text-lg font-semibold">Organizers</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {people.map((person) => (
+          <Card key={person.id}>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <OrganizerAvatar name={person.name} photo={photos[person.id]} className="size-16 text-base" />
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{person.name || 'Organizer'}</p>
+                {person.role ? <p className="text-muted-foreground text-sm">{person.role}</p> : null}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
   )
 }
 
