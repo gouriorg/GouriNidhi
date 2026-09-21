@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { LoadingState } from '@/components/EmptyState'
 import { MoneyText } from '@/components/MoneyText'
 import { PageHeader } from '@/components/PageHeader'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,7 @@ import { fromRupees, percentToBps, toRupees } from '@/domain/money/money'
 import { PayoutScheduleChart } from '@/features/schemes/PayoutScheduleChart'
 import { PayoutScheduleTable } from '@/features/schemes/PayoutScheduleTable'
 import { todayIso } from '@/lib/dates'
+import { nextGnSchemeCode } from '@/lib/schemeCode'
 import { toReadableError } from '@/repositories/errors'
 import { isFinancialsLocked, schemesRepository } from '@/repositories/schemesRepository'
 
@@ -55,12 +57,14 @@ function SchemeForm({
   onSaved: (id: string) => void
 }) {
   const locked = scheme ? isFinancialsLocked(scheme) : false
+  const existingSchemes = useLiveQuery(() => schemesRepository.list(), [])
+  const nextCode = nextGnSchemeCode((existingSchemes ?? []).map((row) => row.code))
+  const assignedCode = scheme?.code ?? nextCode
 
   const form = useForm<SchemeFormValues>({
     resolver: zodResolver(schemeFormSchema),
     mode: 'onChange',
     defaultValues: {
-      code: scheme?.code ?? '',
       name: scheme?.name ?? '',
       description: scheme?.description ?? '',
       maxMembers: scheme?.maxMembers ?? 20,
@@ -125,7 +129,6 @@ function SchemeForm({
   async function onSubmit(raw: SchemeFormValues) {
     const parsed = schemeFormSchema.parse(raw)
     const input = {
-      code: parsed.code,
       name: parsed.name,
       description: parsed.description || undefined,
       monthlyAmount: fromRupees(parsed.monthlyAmountRupees),
@@ -156,7 +159,7 @@ function SchemeForm({
       onSaved(saved.id)
     } catch (error) {
       const message = toReadableError(error, 'Could not save this scheme.')
-      form.setError('code', { message })
+      form.setError('name', { message })
       toast.error(message)
     }
   }
@@ -170,16 +173,23 @@ function SchemeForm({
       </Button>
 
       <PageHeader
-        title={scheme ? `Edit ${scheme.code}` : 'New scheme'}
-        description="Enter the plan below. The monthly payout schedule is calculated for you as you type."
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{scheme ? `Edit ${scheme.name}` : 'New scheme'}</span>
+            <Badge variant="secondary" className="tabular">
+              {assignedCode}
+            </Badge>
+          </span>
+        }
+        description="Enter the plan below. The monthly payout schedule is calculated for you as you type. The scheme code is assigned automatically and cannot be changed."
       />
 
       {locked && (
         <div className="border-warning/35 bg-warning/10 text-warning-foreground mb-6 flex gap-2 rounded-lg border p-3 text-sm">
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
           <p>
-            This scheme is active. Member count, monthly contribution, duration, start date, profit
-            and code are locked so the agreed payout schedule cannot change. Name, notes and the
+            This scheme is active. Member count, monthly contribution, duration, start date and
+            profit are locked so the agreed payout schedule cannot change. Name, notes and the
             collection day can still be edited.
           </p>
         </div>
@@ -198,18 +208,9 @@ function SchemeForm({
                   id="name"
                   label="Scheme name"
                   error={form.formState.errors.name?.message}
+                  hint={`Code ${assignedCode} is assigned automatically and cannot be changed.`}
                 >
                   <Input id="name" {...form.register('name')} placeholder="GouriNidhi Family 2026" />
-                </Field>
-
-                <Field id="code" label="Scheme code" error={form.formState.errors.code?.message}>
-                  <Input
-                    id="code"
-                    {...form.register('code')}
-                    placeholder="GN-001"
-                    disabled={locked}
-                    className="uppercase"
-                  />
                 </Field>
 
                 <Field id="description" label="Description (optional)">

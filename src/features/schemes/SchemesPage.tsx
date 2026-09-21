@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { PlusIcon, SearchIcon, WalletIcon } from 'lucide-react'
+import { PlusIcon, SearchIcon, UploadIcon, WalletIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { BulkImportDialog } from '@/features/bulkImport/BulkImportDialog'
+import { TemplateDownloadButton } from '@/features/bulkImport/TemplateDownloadButton'
 import { schemesRepository } from '@/repositories/schemesRepository'
 import { membershipsRepository } from '@/repositories/membershipsRepository'
 import { formatDisplayDate } from '@/lib/dates'
@@ -26,6 +28,7 @@ import type { SchemeStatus } from '@/types/entities'
 export function SchemesPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<SchemeStatus | 'all'>('all')
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const schemes = useLiveQuery(async () => {
     const rows = await schemesRepository.list()
@@ -54,11 +57,17 @@ export function SchemesPage() {
         title="Schemes"
         description="Each scheme pays one member per month. Early withdrawals receive less, the last month receives the most."
         actions={
-          <Button asChild>
-            <Link to="/schemes/new">
-              <PlusIcon /> New scheme
-            </Link>
-          </Button>
+          <>
+            <TemplateDownloadButton kind="schemes" />
+            <Button variant="outline" onClick={() => setUploadOpen(true)}>
+              <UploadIcon /> Upload
+            </Button>
+            <Button asChild>
+              <Link to="/schemes/new">
+                <PlusIcon /> New scheme
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -85,7 +94,7 @@ export function SchemesPage() {
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="cancelled">Inactive</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -98,11 +107,17 @@ export function SchemesPage() {
           title="No schemes yet"
           description="Create a scheme with the number of members, monthly amount, duration, start date and profit. GouriNidhi works out every month's payout for you."
           action={
-            <Button asChild>
-              <Link to="/schemes/new">
-                <PlusIcon /> Create your first scheme
-              </Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <TemplateDownloadButton kind="schemes" />
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                <UploadIcon /> Upload
+              </Button>
+              <Button asChild>
+                <Link to="/schemes/new">
+                  <PlusIcon /> Create your first scheme
+                </Link>
+              </Button>
+            </div>
           }
         />
       ) : filtered.length === 0 ? (
@@ -176,6 +191,13 @@ export function SchemesPage() {
           </div>
         </>
       )}
+
+      <BulkImportDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        kind="schemes"
+        existingNames={(schemes ?? []).map((scheme) => scheme.name)}
+      />
     </>
   )
 }

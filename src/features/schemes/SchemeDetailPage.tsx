@@ -17,6 +17,7 @@ import { MoneyText } from '@/components/MoneyText'
 import { PageHeader } from '@/components/PageHeader'
 import { StatCard } from '@/components/StatCard'
 import { SchemeStatusBadge } from '@/components/StatusBadge'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -41,7 +42,8 @@ import { formatDisplayDate } from '@/lib/dates'
 export function SchemeDetailPage() {
   const { schemeId = '' } = useParams()
   const [activateOpen, setActivateOpen] = useState(false)
-  const [cancelOpen, setCancelOpen] = useState(false)
+  const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [reactivateOpen, setReactivateOpen] = useState(false)
   const [completeOpen, setCompleteOpen] = useState(false)
 
   const scheme = useLiveQuery(() => schemesRepository.get(schemeId), [schemeId])
@@ -122,12 +124,32 @@ export function SchemeDetailPage() {
     }
   }
 
-  async function setStatus(status: 'completed' | 'cancelled') {
+  async function setStatus(status: 'completed') {
     try {
       await schemesRepository.setStatus(scheme!.id, status)
       toast.success(`Scheme marked ${status}`)
     } catch (error) {
       toast.error(toReadableError(error, 'Could not change the scheme status.'))
+    }
+  }
+
+  async function deactivate() {
+    try {
+      await schemesRepository.deactivate(scheme!.id)
+      toast.success(`${scheme!.code} is inactive. Nothing was deleted.`)
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not deactivate this scheme.'))
+    }
+  }
+
+  async function reactivate() {
+    try {
+      const status = await schemesRepository.reactivate(scheme!.id)
+      toast.success(
+        status === 'draft' ? `${scheme!.code} is a draft again` : `${scheme!.code} is active again`,
+      )
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not reactivate this scheme.'))
     }
   }
 
@@ -140,8 +162,15 @@ export function SchemeDetailPage() {
       </Button>
 
       <PageHeader
-        title={scheme.name}
-        description={`${scheme.code} · ${scheme.maxMembers} members · ${scheme.durationMonths} months · ${scheme.profitBps / 100}% profit`}
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{scheme.name}</span>
+            <Badge variant="secondary" className="tabular">
+              {scheme.code}
+            </Badge>
+          </span>
+        }
+        description={`${scheme.maxMembers} members · ${scheme.durationMonths} months · ${scheme.profitBps / 100}% profit`}
         actions={
           <>
             <SchemeStatusBadge status={scheme.status} />
@@ -158,14 +187,19 @@ export function SchemeDetailPage() {
               </Button>
             )}
             {scheme.status === 'active' && (
-              <>
-                <Button variant="outline" onClick={() => setCompleteOpen(true)}>
-                  <CheckCircle2Icon /> Complete
-                </Button>
-                <Button variant="destructive" onClick={() => setCancelOpen(true)}>
-                  <BanIcon /> Cancel
-                </Button>
-              </>
+              <Button variant="outline" onClick={() => setCompleteOpen(true)}>
+                <CheckCircle2Icon /> Complete
+              </Button>
+            )}
+            {(scheme.status === 'draft' || scheme.status === 'active') && (
+              <Button variant="outline" onClick={() => setDeactivateOpen(true)}>
+                <BanIcon /> Deactivate
+              </Button>
+            )}
+            {scheme.status === 'cancelled' && (
+              <Button onClick={() => setReactivateOpen(true)}>
+                <PlayIcon /> Reactivate
+              </Button>
             )}
           </>
         }
@@ -285,13 +319,21 @@ export function SchemeDetailPage() {
       />
 
       <ConfirmDialog
-        open={cancelOpen}
-        onOpenChange={setCancelOpen}
-        title={`Cancel ${scheme.code}?`}
-        description="The scheme becomes read-only. Existing payments and payouts are kept for the record."
-        confirmLabel="Cancel scheme"
-        destructive
-        onConfirm={() => setStatus('cancelled')}
+        open={deactivateOpen}
+        onOpenChange={setDeactivateOpen}
+        title={`Deactivate ${scheme.code}?`}
+        description="The scheme stays in GouriNidhi as Inactive. Members, rounds, payments and payouts are kept. Nothing is deleted."
+        confirmLabel="Deactivate scheme"
+        onConfirm={deactivate}
+      />
+
+      <ConfirmDialog
+        open={reactivateOpen}
+        onOpenChange={setReactivateOpen}
+        title={`Reactivate ${scheme.code}?`}
+        description="If this scheme already has rounds it becomes Active again. If it never ran it returns to Draft."
+        confirmLabel="Reactivate scheme"
+        onConfirm={reactivate}
       />
     </>
   )

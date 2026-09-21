@@ -43,7 +43,8 @@ export function RolesPage() {
             <p className="font-medium">Can do everything:</p>
             <ul className="text-muted-foreground list-disc space-y-1 pl-5">
               <li>Add, edit and deactivate members</li>
-              <li>Create schemes and see every scheme&rsquo;s member list</li>
+              <li>Create schemes and deactivate them (records are kept, never deleted)</li>
+              <li>See every scheme&rsquo;s member list</li>
               <li>Assign members to schemes and set payout recipients</li>
               <li>Record contributions and payouts</li>
               <li>Read reports, the audit log, and export or restore backups</li>

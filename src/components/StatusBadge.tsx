@@ -25,7 +25,7 @@ const schemeVariants: Record<SchemeStatus, Variant> = {
   draft: 'warning',
   active: 'success',
   completed: 'secondary',
-  cancelled: 'destructive',
+  cancelled: 'muted',
 }
 
 const roundVariants: Record<RoundStatus, Variant> = {

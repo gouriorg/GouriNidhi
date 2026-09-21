@@ -170,12 +170,6 @@ export type PersonFormValues = z.infer<typeof personFormSchema>
 
 export const schemeFormSchema = z
   .object({
-    code: z
-      .string()
-      .trim()
-      .min(2, 'Enter a scheme code')
-      .max(20)
-      .regex(/^[A-Za-z0-9-]+$/, 'Use letters, numbers and dashes only'),
     name: z.string().trim().min(2, 'Enter a scheme name').max(80),
     description: z.string().trim().max(500).optional().or(z.literal('')),
     maxMembers: z.coerce.number<number>().int('Whole numbers only').min(2, 'At least 2 members').max(500),
