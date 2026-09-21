@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { AUTH_WARNING } from '@/config/auth'
 import { getSupabaseProject, projectHostLabel } from '@/config/supabaseProject'
 import { ConnectSupabaseForm } from '@/features/settings/ConnectSupabaseForm'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import { login } from '@/services/auth'
 import { useSession, useSessionStore } from '@/stores/session'
 
@@ -54,12 +55,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="bg-background grid min-h-dvh place-items-center px-4 py-10">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
+    <>
+      <div className="bg-background grid min-h-dvh place-items-center px-4 py-10 pb-24">
+        <div className="absolute top-4 right-4">
+          <ThemeToggle />
+        </div>
 
-      <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
           <BrandLockup />
         </div>
@@ -136,6 +138,8 @@ export function LoginPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+      <SiteFooter />
+    </>
   )
 }

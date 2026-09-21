@@ -2,6 +2,7 @@ import { LogOutIcon } from 'lucide-react'
 import { Outlet } from 'react-router'
 
 import { BrandLockup } from '@/components/brand/Logo'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import { OfflineBadge } from '@/components/OfflineBadge'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
@@ -26,9 +27,10 @@ export function MemberLayout() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl px-4 py-6 pb-16">
+      <main className="mx-auto w-full max-w-3xl px-4 py-6 pb-24">
         <Outlet />
       </main>
+      <SiteFooter />
     </div>
   )
 }

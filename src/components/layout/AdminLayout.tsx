@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router'
 
 import { AdminBottomNav } from '@/components/layout/AdminBottomNav'
 import { adminNavItems } from '@/components/layout/nav-items'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import { BrandLockup, LogoMark } from '@/components/brand/Logo'
 import { OfflineBadge } from '@/components/OfflineBadge'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -72,12 +73,13 @@ export function AdminLayout() {
         </header>
       </div>
 
-      <main className="px-4 pt-6 pb-24 lg:pl-68 lg:pr-6 lg:pb-10">
+      <main className="px-4 pt-6 pb-28 lg:pl-68 lg:pr-6 lg:pb-20">
         <div className="mx-auto w-full max-w-7xl">
           <Outlet />
         </div>
       </main>
 
+      <SiteFooter offset="admin" />
       <AdminBottomNav />
     </div>
   )

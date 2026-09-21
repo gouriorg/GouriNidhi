@@ -255,8 +255,24 @@ drop policy if exists settings_admin_all on public.settings;
 create policy settings_admin_all on public.settings
   for all using (public.is_admin()) with check (public.is_admin());
 
+-- Public/member read of site copy and organizer photos stored in settings.
+drop policy if exists settings_public_organizer_photos on public.settings;
+drop policy if exists settings_public_site_content on public.settings;
+create policy settings_public_site_content on public.settings
+  for select
+  to anon, authenticated
+  using (
+    key in (
+      'site.organizer_photos',
+      'site.contact',
+      'site.organizers',
+      'site.terms'
+    )
+  );
+
 grant usage on schema public to authenticated, anon;
 grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on public.settings to anon, authenticated;
 grant execute on function public.is_admin() to authenticated, anon;
 grant execute on function public.my_person_id() to authenticated, anon;
 
