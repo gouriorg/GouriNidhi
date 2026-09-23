@@ -1,6 +1,6 @@
 import { membershipsRepository } from '@/repositories/membershipsRepository'
 import { roundsRepository } from '@/repositories/roundsRepository'
-import { displayStatus, paymentsRepository } from '@/repositories/paymentsRepository'
+import { displayStatus } from '@/repositories/paymentsRepository'
 import { payoutsRepository } from '@/repositories/payoutsRepository'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import { getSupabase } from '@/lib/supabase'
