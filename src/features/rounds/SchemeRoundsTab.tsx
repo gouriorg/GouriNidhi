@@ -9,6 +9,7 @@ import { RoundStatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { payoutsRepository } from '@/repositories/payoutsRepository'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import { roundsRepository } from '@/repositories/roundsRepository'
 import { formatDisplayDate, formatShortMonth, isCurrentOrPastMonth } from '@/lib/dates'
@@ -19,16 +20,22 @@ import type { Scheme } from '@/types/entities'
 export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
   const rounds = useLiveQuery(async () => {
     await roundsRepository.openDueCollections()
-    const rows = await roundsRepository.listForScheme(scheme.id)
-    const ids = rows.map((round) => round.recipientPersonId).filter((id): id is string => Boolean(id))
+    const [rows, payouts] = await Promise.all([
+      roundsRepository.listForScheme(scheme.id),
+      payoutsRepository.listForScheme(scheme.id),
+    ])
+    const ids = [...new Set(payouts.map((payout) => payout.personId))]
     const people = await Promise.all(ids.map((id) => peopleRepository.get(id)))
     const nameById = new Map(people.filter(Boolean).map((person) => [person!.id, person!.fullName]))
-    return rows.map((round) => ({
-      ...round,
-      recipientName: round.recipientPersonId
-        ? (nameById.get(round.recipientPersonId) ?? 'Unknown')
-        : undefined,
-    }))
+    return rows.map((round) => {
+      const names = payouts
+        .filter((payout) => payout.roundId === round.id)
+        .map((payout) => nameById.get(payout.personId) ?? 'Unknown')
+      return {
+        ...round,
+        recipientName: names.length > 0 ? names.join(', ') : undefined,
+      }
+    })
   }, [scheme.id])
 
   async function generate() {

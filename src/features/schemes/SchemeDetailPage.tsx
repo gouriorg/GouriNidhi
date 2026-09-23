@@ -57,19 +57,19 @@ export function SchemeDetailPage() {
       payoutsRepository.listForScheme(schemeId),
     ])
 
-    const recipientIds = rounds
-      .map((round) => round.recipientPersonId)
-      .filter((id): id is string => Boolean(id))
+    const recipientIds = [...new Set(payouts.map((payout) => payout.personId))]
     const people = await Promise.all(recipientIds.map((id) => peopleRepository.get(id)))
     const nameById = new Map(people.filter(Boolean).map((p) => [p!.id, p!.fullName]))
 
     const recipients: RecipientLookup = {}
     for (const round of rounds) {
-      if (!round.recipientPersonId) continue
-      const payout = payouts.find((p) => p.roundId === round.id)
+      const monthWinners = payouts.filter((payout) => payout.roundId === round.id)
+      if (monthWinners.length === 0) continue
       recipients[round.monthNumber] = {
-        name: nameById.get(round.recipientPersonId) ?? 'Unknown',
-        paid: payout?.status === 'paid',
+        name: monthWinners
+          .map((payout) => nameById.get(payout.personId) ?? 'Unknown')
+          .join(', '),
+        paid: monthWinners.every((payout) => payout.status === 'paid'),
       }
     }
 
