@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 
 import { formatINR, toRupees } from '@/domain/money/money'
+import { formatShortMonth } from '@/lib/dates'
 import type { ScheduleLine } from '@/types/entities'
 
 /** Bar chart of the rising monthly payout, with the pool marked as a baseline. */
@@ -22,7 +23,8 @@ export function PayoutScheduleChart({
   highlightMonth?: number
 }) {
   const data = lines.map((line) => ({
-    month: line.monthNumber,
+    month: formatShortMonth(line.dueDate),
+    monthNumber: line.monthNumber,
     payout: toRupees(line.plannedPayoutAmount),
     paise: line.plannedPayoutAmount,
   }))
@@ -65,7 +67,7 @@ export function PayoutScheduleChart({
               formatINR((item.payload as { paise: number }).paise),
               'Payout',
             ]}
-            labelFormatter={(label) => `Month ${label}`}
+            labelFormatter={(label) => String(label)}
           />
           <ReferenceLine
             y={pool}
@@ -81,9 +83,9 @@ export function PayoutScheduleChart({
           <Bar dataKey="payout" radius={[4, 4, 0, 0]}>
             {data.map((entry) => (
               <Cell
-                key={entry.month}
+                key={entry.monthNumber}
                 fill={
-                  highlightMonth === entry.month
+                  highlightMonth === entry.monthNumber
                     ? 'var(--color-chart-2)'
                     : 'var(--color-chart-1)'
                 }

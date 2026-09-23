@@ -13,7 +13,7 @@ import { getSupabaseProject, projectHostLabel } from '@/config/supabaseProject'
 import { ConnectSupabaseForm } from '@/features/settings/ConnectSupabaseForm'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { login } from '@/services/auth'
-import { useSession, useSessionStore } from '@/stores/session'
+import { homePath, useSession, useSessionStore } from '@/stores/session'
 
 export function LoginPage() {
   const session = useSession()
@@ -30,7 +30,7 @@ export function LoginPage() {
   const projectHost = project ? projectHostLabel(project.url) : null
 
   if (session) {
-    return <Navigate to={session.kind === 'admin' ? '/' : '/me'} replace />
+    return <Navigate to={homePath(session)} replace />
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -46,7 +46,7 @@ export function LoginPage() {
       }
 
       setSession(result.session)
-      navigate(result.session.kind === 'admin' ? '/' : '/me', { replace: true })
+      navigate(homePath(result.session), { replace: true })
     } catch {
       setError('Could not sign in. Check your connection and Supabase configuration.')
     } finally {

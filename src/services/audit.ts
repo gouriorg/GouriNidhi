@@ -1,3 +1,4 @@
+import { features } from '@/config/features'
 import { getSupabase } from '@/lib/supabase'
 import { auditToRow, mapAudit } from '@/lib/mappers'
 import { newId, nowIso } from '@/lib/id'
@@ -52,6 +53,7 @@ export const auditService = {
   },
 
   async record(input: AuditInput): Promise<void> {
+    if (!features.auditLog) return
     const log = auditService.build(input)
     await getSupabase().from('audit_logs').insert(auditToRow(log))
   },
@@ -63,6 +65,7 @@ export const auditService = {
     to?: string
     search?: string
   }): Promise<AuditLog[]> {
+    if (!features.auditLog) return []
     let query = getSupabase().from('audit_logs').select('*').order('created_at', { ascending: false })
     const { data, error } = await query
     if (error) return []

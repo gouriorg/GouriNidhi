@@ -1,7 +1,7 @@
 import type { Session } from '@/stores/session'
+import { isCashierSession } from '@/stores/session'
 
-/** Only two roles exist in the MVP. */
-export type AppRole = 'admin' | 'member'
+export type AppRole = 'admin' | 'member' | 'cashier'
 
 export type Action =
   | 'members.manage'
@@ -10,6 +10,9 @@ export type Action =
   | 'rounds.manage'
   | 'payments.manage'
   | 'payouts.manage'
+  | 'cashiers.manage'
+  | 'payments.collect'
+  | 'payouts.handover'
   | 'reports.view'
   | 'audit.view'
   | 'backup.manage'
@@ -23,6 +26,9 @@ const adminActions: Action[] = [
   'rounds.manage',
   'payments.manage',
   'payouts.manage',
+  'cashiers.manage',
+  'payments.collect',
+  'payouts.handover',
   'reports.view',
   'audit.view',
   'backup.manage',
@@ -30,14 +36,18 @@ const adminActions: Action[] = [
   'self.view',
 ]
 
-/** Members can only read their own data. */
+const cashierActions: Action[] = ['payments.collect', 'payouts.handover', 'self.view']
 const memberActions: Action[] = ['self.view']
 
 export function can(role: AppRole, action: Action): boolean {
-  return role === 'admin' ? adminActions.includes(action) : memberActions.includes(action)
+  if (role === 'admin') return adminActions.includes(action)
+  if (role === 'cashier') return cashierActions.includes(action)
+  return memberActions.includes(action)
 }
 
 export function roleOf(session: Session): AppRole | null {
   if (!session) return null
-  return session.kind === 'admin' ? 'admin' : 'member'
+  if (session.kind === 'admin') return 'admin'
+  if (isCashierSession(session)) return 'cashier'
+  return 'member'
 }

@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { features } from '@/config/features'
 import { countAllRows, backupService, type BackupEnvelope, type TableCounts } from '@/services/backup'
 import { loadSampleData } from '@/db/seed'
 import { ConnectSupabaseForm } from '@/features/settings/ConnectSupabaseForm'
@@ -280,7 +281,9 @@ export function SettingsPage() {
                     {pending.envelope.schemaVersion}
                   </p>
                   <ul className="text-muted-foreground mt-2 grid grid-cols-2 gap-x-4 text-xs">
-                    {Object.entries(pending.counts).map(([table, count]) => (
+                    {Object.entries(pending.counts)
+                      .filter(([table]) => features.auditLog || table !== 'auditLogs')
+                      .map(([table, count]) => (
                       <li key={table} className="flex justify-between">
                         <span>{table}</span>
                         <span className="tabular">{count}</span>
@@ -319,7 +322,9 @@ export function SettingsPage() {
             <Separator />
             <dl className="grid gap-1.5 text-sm">
               {counts &&
-                Object.entries(counts).map(([table, count]) => (
+                Object.entries(counts)
+                  .filter(([table]) => features.auditLog || table !== 'auditLogs')
+                  .map(([table, count]) => (
                   <Row key={table} label={table} value={String(count)} />
                 ))}
             </dl>

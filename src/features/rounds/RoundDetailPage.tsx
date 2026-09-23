@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RoundPaymentsTab } from '@/features/payments/RoundPaymentsTab'
 import { RoundPayoutTab } from '@/features/payouts/RoundPayoutTab'
 import { roundStatusLabels } from '@/lib/constants'
-import { formatDisplayDate } from '@/lib/dates'
+import { formatDisplayDate, formatShortMonth } from '@/lib/dates'
 import { formatINR } from '@/domain/money/money'
 import { toReadableError } from '@/repositories/errors'
 import { membershipsRepository } from '@/repositories/membershipsRepository'
@@ -71,7 +71,7 @@ export function RoundDetailPage() {
       </Button>
 
       <PageHeader
-        title={`Month ${round.monthNumber}`}
+        title={formatShortMonth(round.dueDate)}
         description={`${scheme.code} · due ${formatDisplayDate(round.dueDate)}`}
         actions={
           <>

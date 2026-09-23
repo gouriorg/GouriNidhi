@@ -2,14 +2,21 @@ import { create } from 'zustand'
 
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase'
 import { logout, sessionFromUser } from '@/services/auth'
+import type { PersonRole } from '@/types/entities'
 
 /**
  * Workspace session, hydrated from Supabase Auth.
- * Admin is a real Auth user (admin@gourinidhi.local). Members are people rows.
+ * Admin is a real Auth user (admin@gourinidhi.local). Members and cashiers are people rows.
  */
 export type Session =
   | { kind: 'admin' }
-  | { kind: 'member'; personId: string; fullName: string; mobile: string }
+  | {
+      kind: 'member'
+      personId: string
+      fullName: string
+      mobile: string
+      roles: PersonRole[]
+    }
   | null
 
 type SessionState = {
@@ -31,6 +38,17 @@ export async function resetSessionRuntime(): Promise<void> {
     // Ignore if there is no client or session yet.
   }
   useSessionStore.setState({ session: null, hydrated: false })
+}
+
+export function isCashierSession(session: Session): boolean {
+  return session?.kind === 'member' && session.roles.includes('cashier')
+}
+
+export function homePath(session: Session): string {
+  if (session?.kind === 'admin') return '/'
+  if (isCashierSession(session)) return '/collect'
+  if (session?.kind === 'member') return '/me'
+  return '/login'
 }
 
 export const useSessionStore = create<SessionState>()((set) => ({
@@ -67,3 +85,4 @@ export const useSessionStore = create<SessionState>()((set) => ({
 
 export const useSession = () => useSessionStore((s) => s.session)
 export const useIsAdmin = () => useSessionStore((s) => s.session?.kind === 'admin')
+export const useIsCashier = () => isCashierSession(useSessionStore((s) => s.session))

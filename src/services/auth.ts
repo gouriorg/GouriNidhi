@@ -2,24 +2,20 @@ import { ADMIN_CREDENTIALS, ADMIN_EMAIL, memberEmail } from '@/config/auth'
 import { getSupabase } from '@/lib/supabase'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import type { Session } from '@/stores/session'
+import type { PersonRole } from '@/types/entities'
 
 export type LoginResult =
   | { ok: true; session: NonNullable<Session> }
   | { ok: false; message: string }
 
-async function roleFor(userId: string): Promise<'admin' | 'member' | null> {
-  const { data } = await getSupabase()
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (data?.role === 'admin' || data?.role === 'member') return data.role
-  return null
+async function rolesFor(userId: string): Promise<string[]> {
+  const { data } = await getSupabase().from('user_roles').select('role').eq('user_id', userId)
+  return (data ?? []).map((row) => String(row.role))
 }
 
 export async function sessionFromUser(userId: string, email?: string | null): Promise<Session> {
-  const role = await roleFor(userId)
-  if (role === 'admin' || email === ADMIN_EMAIL) {
+  const roles = await rolesFor(userId)
+  if (roles.includes('admin') || email === ADMIN_EMAIL) {
     return { kind: 'admin' }
   }
 
@@ -32,17 +28,21 @@ export async function sessionFromUser(userId: string, email?: string | null): Pr
   if (!person) return null
   if (person.status !== 'active') return null
 
+  const personRoles = roles.filter((role): role is PersonRole => role === 'member' || role === 'cashier')
+  if (personRoles.length === 0) personRoles.push('member')
+
   return {
     kind: 'member',
     personId: person.id,
     fullName: person.fullName,
     mobile: person.mobile,
+    roles: personRoles,
   }
 }
 
 /**
  * Username + password on the login screen. Admin is still admin/admin; members
- * use their 10-digit mobile as both fields. Auth is checked on Supabase.
+ * and cashiers use their 10-digit mobile as both fields. Auth is checked on Supabase.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
   const user = username.trim()
@@ -91,7 +91,7 @@ export async function login(username: string, password: string): Promise<LoginRe
     await supabase.auth.signOut()
     return {
       ok: false,
-      message: 'This member is inactive. Ask the admin to reactivate the account.',
+      message: 'This account is inactive. Ask the admin to reactivate it.',
     }
   }
 

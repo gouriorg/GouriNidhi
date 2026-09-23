@@ -6,6 +6,7 @@ export type Timestamp = string
 export type DateOnly = string
 
 export type PersonStatus = 'active' | 'inactive'
+export type PersonRole = 'member' | 'cashier'
 
 /**
  * Every person record is a Member. Admin is a hardcoded login, not a row here.
@@ -68,6 +69,7 @@ export type SchemeMember = {
   memberNumber: number
   status: SchemeMemberStatus
   joinedAt: DateOnly
+  collectorPersonId?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -113,6 +115,7 @@ export type Payment = {
   reference?: string
   status: PaymentStatus
   notes?: string
+  recordedByPersonId?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -135,6 +138,7 @@ export type Payout = {
   reference?: string
   status: PayoutStatus
   notes?: string
+  recordedByPersonId?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }

@@ -34,6 +34,12 @@ export function formatMonthLabel(value: DateOnly): string {
   return format(parseDateOnly(value), 'MMM yyyy')
 }
 
+/** "Sep 26" for cashier month buttons. */
+export function formatShortMonth(value?: DateOnly): string {
+  if (!value || !isValidDateOnly(value)) return '—'
+  return format(parseDateOnly(value), 'MMM yy')
+}
+
 export function formatDisplayDateTime(iso: string): string {
   const date = new Date(iso)
   if (!isValid(date)) return '—'
@@ -73,4 +79,9 @@ export function clampCollectionDay(day: number): number {
 /** A due date is overdue when it is strictly before today. */
 export function isPastDue(dueDate: DateOnly, today: DateOnly = todayIso()): boolean {
   return dueDate < today
+}
+
+/** Current calendar month and every older month — these open collection automatically. */
+export function isCurrentOrPastMonth(dueDate: DateOnly, today: DateOnly = todayIso()): boolean {
+  return dueDate.slice(0, 7) <= today.slice(0, 7)
 }

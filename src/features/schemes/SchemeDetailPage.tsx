@@ -270,7 +270,10 @@ export function SchemeDetailPage() {
               <Detail label="Code" value={scheme.code} />
               <Detail label="Status" value={<SchemeStatusBadge status={scheme.status} />} />
               <Detail label="Start date" value={formatDisplayDate(scheme.startDate)} />
-              <Detail label="Collection day" value={`Day ${scheme.collectionDay} of each month`} />
+              <Detail
+                label="Monthly due day"
+                value={`Day ${scheme.collectionDay} of each month`}
+              />
               <Detail label="Members" value={String(scheme.maxMembers)} />
               <Detail label="Duration" value={`${scheme.durationMonths} months`} />
               <Detail label="Profit" value={`${scheme.profitBps / 100}%`} />

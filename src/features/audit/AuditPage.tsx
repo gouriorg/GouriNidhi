@@ -1,6 +1,9 @@
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { HistoryIcon, SearchIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Navigate } from 'react-router'
+
+import { features } from '@/config/features'
 
 import { EmptyState, LoadingState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
@@ -63,6 +66,8 @@ export function AuditPage() {
       return true
     })
   }, [logs, search, entityType, action, from, to])
+
+  if (!features.auditLog) return <Navigate to="/" replace />
 
   return (
     <>

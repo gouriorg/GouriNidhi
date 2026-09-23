@@ -23,7 +23,7 @@ import { roundsRepository } from '@/repositories/roundsRepository'
 import { getDistributionStrategy } from '@/domain/distribution/registry'
 import { fromRupees, toRupees } from '@/domain/money/money'
 import { paymentMethodLabels } from '@/lib/constants'
-import { todayIso } from '@/lib/dates'
+import { formatShortMonth, todayIso } from '@/lib/dates'
 import { membershipsRepository } from '@/repositories/membershipsRepository'
 import { payoutsRepository } from '@/repositories/payoutsRepository'
 import { toReadableError } from '@/repositories/errors'
@@ -126,12 +126,12 @@ export function RoundPayoutTab({ round, scheme }: { round: Round; scheme: Scheme
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <Card>
         <CardHeader>
-          <CardTitle>Month {round.monthNumber} payout</CardTitle>
+          <CardTitle>{formatShortMonth(round.dueDate)} payout</CardTitle>
           <CardDescription>
             {isFirstMonth
-              ? 'Month 1 is an early withdrawal, so it pays the lowest amount of the whole scheme.'
+              ? `${formatShortMonth(round.dueDate)} is an early withdrawal, so it pays the lowest amount of the whole scheme.`
               : isLastMonth
-                ? 'This is the final month, so it pays the highest amount of the whole scheme.'
+                ? `${formatShortMonth(round.dueDate)} is the final month, so it pays the highest amount of the whole scheme.`
                 : 'Amounts rise every month: earlier withdrawals receive less, later ones receive more.'}
           </CardDescription>
         </CardHeader>
@@ -334,7 +334,7 @@ export function RoundPayoutTab({ round, scheme }: { round: Round; scheme: Scheme
             <strong>
               {roster.find((r) => r.personId === personId)?.person.fullName ?? 'this member'}
             </strong>{' '}
-            for month {round.monthNumber}. This marks the round as payout complete.
+            for {formatShortMonth(round.dueDate)}. This marks the round as payout complete.
           </span>
         }
         confirmLabel="Mark paid"

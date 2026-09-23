@@ -8,9 +8,10 @@ create extension if not exists pgcrypto;
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.user_roles (
-  user_id uuid primary key references auth.users (id) on delete cascade,
-  role text not null check (role in ('admin', 'member')),
-  created_at timestamptz not null default now()
+  user_id uuid not null references auth.users (id) on delete cascade,
+  role text not null check (role in ('admin', 'member', 'cashier')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, role)
 );
 
 create table if not exists public.people (
@@ -51,6 +52,7 @@ create table if not exists public.scheme_members (
   member_number integer not null,
   status text not null default 'active' check (status in ('active', 'inactive')),
   joined_at date not null,
+  collector_person_id uuid references public.people (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (scheme_id, person_id),
@@ -86,6 +88,7 @@ create table if not exists public.payments (
   reference text,
   status text not null default 'pending',
   notes text,
+  recorded_by_person_id uuid references public.people (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (scheme_id, round_id, person_id)
@@ -105,6 +108,7 @@ create table if not exists public.payouts (
   reference text,
   status text not null default 'pending',
   notes text,
+  recorded_by_person_id uuid references public.people (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (scheme_id, round_id)
@@ -132,6 +136,7 @@ create table if not exists public.settings (
 create index if not exists people_mobile_idx on public.people (mobile);
 create index if not exists scheme_members_scheme_idx on public.scheme_members (scheme_id);
 create index if not exists scheme_members_person_idx on public.scheme_members (person_id);
+create index if not exists scheme_members_collector_idx on public.scheme_members (collector_person_id);
 create index if not exists rounds_scheme_idx on public.rounds (scheme_id);
 create index if not exists payments_round_idx on public.payments (round_id);
 create index if not exists payments_person_idx on public.payments (person_id);
@@ -165,6 +170,19 @@ as $$
   select id from public.people where auth_user_id = auth.uid() limit 1;
 $$;
 
+create or replace function public.is_cashier()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.user_roles
+    where user_id = auth.uid() and role = 'cashier'
+  );
+$$;
+
 -- ---------------------------------------------------------------------------
 -- RLS
 -- ---------------------------------------------------------------------------
@@ -195,6 +213,20 @@ drop policy if exists people_self_read on public.people;
 create policy people_self_read on public.people
   for select using (id = public.my_person_id());
 
+drop policy if exists people_cashier_read on public.people;
+create policy people_cashier_read on public.people
+  for select using (
+    public.is_cashier()
+    and (
+      id = public.my_person_id()
+      or exists (
+        select 1 from public.scheme_members sm
+        where sm.person_id = people.id
+          and sm.collector_person_id = public.my_person_id()
+      )
+    )
+  );
+
 drop policy if exists schemes_admin_all on public.schemes;
 create policy schemes_admin_all on public.schemes
   for all using (public.is_admin()) with check (public.is_admin());
@@ -207,6 +239,12 @@ create policy schemes_member_read on public.schemes
       where sm.scheme_id = schemes.id
         and sm.person_id = public.my_person_id()
     )
+    or exists (
+      select 1 from public.scheme_members sm
+      where sm.scheme_id = schemes.id
+        and sm.collector_person_id = public.my_person_id()
+        and public.is_cashier()
+    )
   );
 
 drop policy if exists scheme_members_admin_all on public.scheme_members;
@@ -215,7 +253,10 @@ create policy scheme_members_admin_all on public.scheme_members
 
 drop policy if exists scheme_members_self_read on public.scheme_members;
 create policy scheme_members_self_read on public.scheme_members
-  for select using (person_id = public.my_person_id());
+  for select using (
+    person_id = public.my_person_id()
+    or (public.is_cashier() and collector_person_id = public.my_person_id())
+  );
 
 drop policy if exists rounds_admin_all on public.rounds;
 create policy rounds_admin_all on public.rounds
@@ -227,7 +268,10 @@ create policy rounds_member_read on public.rounds
     exists (
       select 1 from public.scheme_members sm
       where sm.scheme_id = rounds.scheme_id
-        and sm.person_id = public.my_person_id()
+        and (
+          sm.person_id = public.my_person_id()
+          or (public.is_cashier() and sm.collector_person_id = public.my_person_id())
+        )
     )
   );
 
@@ -239,6 +283,38 @@ drop policy if exists payments_self_read on public.payments;
 create policy payments_self_read on public.payments
   for select using (person_id = public.my_person_id());
 
+drop policy if exists payments_cashier_read on public.payments;
+create policy payments_cashier_read on public.payments
+  for select using (
+    public.is_cashier()
+    and exists (
+      select 1 from public.scheme_members sm
+      where sm.scheme_id = payments.scheme_id
+        and sm.person_id = payments.person_id
+        and sm.collector_person_id = public.my_person_id()
+    )
+  );
+
+drop policy if exists payments_cashier_update on public.payments;
+create policy payments_cashier_update on public.payments
+  for update using (
+    public.is_cashier()
+    and exists (
+      select 1 from public.scheme_members sm
+      where sm.scheme_id = payments.scheme_id
+        and sm.person_id = payments.person_id
+        and sm.collector_person_id = public.my_person_id()
+    )
+  ) with check (
+    public.is_cashier()
+    and exists (
+      select 1 from public.scheme_members sm
+      where sm.scheme_id = payments.scheme_id
+        and sm.person_id = payments.person_id
+        and sm.collector_person_id = public.my_person_id()
+    )
+  );
+
 drop policy if exists payouts_admin_all on public.payouts;
 create policy payouts_admin_all on public.payouts
   for all using (public.is_admin()) with check (public.is_admin());
@@ -246,6 +322,18 @@ create policy payouts_admin_all on public.payouts
 drop policy if exists payouts_self_read on public.payouts;
 create policy payouts_self_read on public.payouts
   for select using (person_id = public.my_person_id());
+
+drop policy if exists payouts_cashier_read on public.payouts;
+create policy payouts_cashier_read on public.payouts
+  for select using (
+    public.is_cashier()
+    and exists (
+      select 1 from public.scheme_members sm
+      where sm.scheme_id = payouts.scheme_id
+        and sm.person_id = payouts.person_id
+        and sm.collector_person_id = public.my_person_id()
+    )
+  );
 
 drop policy if exists audit_admin_all on public.audit_logs;
 create policy audit_admin_all on public.audit_logs
@@ -275,6 +363,7 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant select on public.settings to anon, authenticated;
 grant execute on function public.is_admin() to authenticated, anon;
 grant execute on function public.my_person_id() to authenticated, anon;
+grant execute on function public.is_cashier() to authenticated, anon;
 
 -- The first admin Auth user is created by the bootstrap-admin Edge Function
 -- (email admin@gourinidhi.local, password admin). Member logins use

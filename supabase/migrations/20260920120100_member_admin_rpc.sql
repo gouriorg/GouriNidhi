@@ -195,7 +195,7 @@ begin
     where id = v_id
     returning * into v_person;
     insert into public.user_roles (user_id, role) values (v_user_id, 'member')
-    on conflict (user_id) do nothing;
+    on conflict (user_id, role) do nothing;
 
     return jsonb_build_object('ok', true, 'person', to_jsonb(v_person));
   end if;

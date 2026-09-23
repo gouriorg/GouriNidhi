@@ -7,6 +7,7 @@ import { auditService } from '@/services/audit'
 import { notifyDataChanged } from '@/stores/dataVersion'
 import { RepositoryError } from '@/repositories/errors'
 import { peopleRepository } from '@/repositories/peopleRepository'
+import { roundsRepository } from '@/repositories/roundsRepository'
 import { schemesRepository } from '@/repositories/schemesRepository'
 import type { Person, SchemeMember } from '@/types/entities'
 
@@ -92,6 +93,9 @@ export const membershipsRepository = {
         before: existing,
         after: reactivated,
       })
+      if (scheme.status === 'active') {
+        await roundsRepository.openDueCollections()
+      }
       notifyDataChanged()
       return reactivated
     }
@@ -124,6 +128,9 @@ export const membershipsRepository = {
       summary: `Added ${person.fullName} to ${scheme.code} as member #${nextNumber}`,
       after: membership,
     })
+    if (scheme.status === 'active') {
+      await roundsRepository.openDueCollections()
+    }
     notifyDataChanged()
     return membership
   },
@@ -208,6 +215,56 @@ export const membershipsRepository = {
       before: membership,
     })
     notifyDataChanged()
+  },
+
+  async setCollector(membershipId: string, collectorPersonId: string | null): Promise<void> {
+    const { data, error } = await getSupabase()
+      .from('scheme_members')
+      .select('*')
+      .eq('id', membershipId)
+      .maybeSingle()
+    throwIfError(error)
+    if (!data) throw new RepositoryError('Membership not found')
+    const before = mapMembership(data)
+    const updated: SchemeMember = { ...before, collectorPersonId: collectorPersonId ?? undefined, updatedAt: nowIso() }
+    const { error: updateError } = await getSupabase()
+      .from('scheme_members')
+      .update(membershipToRow(updated))
+      .eq('id', membershipId)
+    throwIfError(updateError)
+    notifyDataChanged()
+  },
+
+  async assignUnassigned(schemeId: string, collectorPersonId: string): Promise<number> {
+    const { data, error } = await getSupabase()
+      .from('scheme_members')
+      .update({ collector_person_id: collectorPersonId, updated_at: nowIso() })
+      .eq('scheme_id', schemeId)
+      .eq('status', 'active')
+      .is('collector_person_id', null)
+      .select('id')
+    throwIfError(error)
+    notifyDataChanged()
+    return data?.length ?? 0
+  },
+
+  async listActive(): Promise<SchemeMember[]> {
+    const { data, error } = await getSupabase()
+      .from('scheme_members')
+      .select('*')
+      .eq('status', 'active')
+    throwIfError(error)
+    return (data ?? []).map(mapMembership)
+  },
+
+  async listAssignedTo(collectorPersonId: string): Promise<SchemeMember[]> {
+    const { data, error } = await getSupabase()
+      .from('scheme_members')
+      .select('*')
+      .eq('collector_person_id', collectorPersonId)
+      .eq('status', 'active')
+    throwIfError(error)
+    return (data ?? []).map(mapMembership)
   },
 
   async setStatus(membershipId: string, status: SchemeMember['status']): Promise<void> {

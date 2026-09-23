@@ -1,11 +1,11 @@
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { useSession } from '@/stores/session'
+import { homePath, useSession } from '@/stores/session'
 
 export function NotFoundPage() {
   const session = useSession()
-  const home = session?.kind === 'member' ? '/me' : '/'
+  const home = homePath(session)
 
   return (
     <div className="grid min-h-dvh place-items-center px-4 text-center">

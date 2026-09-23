@@ -207,6 +207,7 @@ export const schemesRepository = {
       before: scheme,
       after: activated,
     })
+    await getSupabase().rpc('open_due_collections')
     notifyDataChanged()
     return { roundsCreated }
   },
@@ -231,6 +232,7 @@ export const schemesRepository = {
       entityId: id,
       summary: `Generated ${rounds.length} rounds for ${scheme.code}`,
     })
+    await getSupabase().rpc('open_due_collections')
     notifyDataChanged()
     return rounds.length
   },

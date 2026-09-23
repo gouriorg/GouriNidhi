@@ -190,7 +190,7 @@ function SchemeForm({
           <p>
             This scheme is active. Member count, monthly contribution, duration, start date and
             profit are locked so the agreed payout schedule cannot change. Name, notes and the
-            collection day can still be edited.
+            monthly due day can still be edited.
           </p>
         </div>
       )}
@@ -292,9 +292,9 @@ function SchemeForm({
 
                   <Field
                     id="collectionDay"
-                    label="Collection day"
+                    label="Monthly due day"
                     error={form.formState.errors.collectionDay?.message}
-                    hint="Day 1–28 of each month."
+                    hint="Same day every month (1–28). After that day, unpaid members are highlighted for their cashier and listed on the admin dashboard to call."
                   >
                     <Input
                       id="collectionDay"
