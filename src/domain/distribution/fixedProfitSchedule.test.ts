@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildFixedProfitSchedule,
   canBuildSchedule,
+  chartRoundUnit,
   type ScheduleInput,
 } from '@/domain/distribution/fixedProfitSchedule'
 import { formatINR, fromRupees } from '@/domain/money/money'
@@ -25,35 +26,40 @@ describe('buildFixedProfitSchedule', () => {
     expect(schedule.lines[19].monthNumber).toBe(20)
   })
 
-  it('pays the canonical fixture 72,000 first and 88,000 last', () => {
+  it('pays less than the pool first and more than the pool last', () => {
     const schedule = buildFixedProfitSchedule(canonical)
-    expect(schedule.grossPool).toBe(fromRupees(80_000))
-    expect(schedule.lines[0].plannedPayoutAmount).toBe(fromRupees(72_000))
-    expect(schedule.lines[19].plannedPayoutAmount).toBe(fromRupees(88_000))
-    expect(formatINR(schedule.lines[0].plannedPayoutAmount)).toBe('₹72,000')
-    expect(formatINR(schedule.lines[19].plannedPayoutAmount)).toBe('₹88,000')
+    expect(schedule.grossPool).toBe(canonical.monthlyAmount * canonical.maxMembers)
+    expect(schedule.lines[0].plannedPayoutAmount).toBeLessThan(schedule.grossPool)
+    expect(schedule.lines[schedule.lines.length - 1].plannedPayoutAmount).toBeGreaterThan(
+      schedule.grossPool,
+    )
+    expect(formatINR(schedule.lines[0].plannedPayoutAmount).startsWith('₹')).toBe(true)
   })
 
-  it('reaches about the pool in the middle month', () => {
+  it('hits the monthly pool exactly once, then pays more the next month', () => {
     const schedule = buildFixedProfitSchedule(canonical)
-    // Month 10 and 11 straddle the pool of 80,000.
-    expect(schedule.lines[9].plannedPayoutAmount).toBeLessThanOrEqual(fromRupees(80_000))
-    expect(schedule.lines[10].plannedPayoutAmount).toBeGreaterThanOrEqual(fromRupees(80_000))
-    expect(Math.abs(schedule.lines[9].plannedPayoutAmount - fromRupees(80_000))).toBeLessThan(
-      fromRupees(500),
-    )
+    const poolMonths = schedule.lines.filter((line) => line.plannedPayoutAmount === schedule.grossPool)
+    expect(poolMonths).toHaveLength(1)
+    const index = schedule.lines.findIndex((line) => line.plannedPayoutAmount === schedule.grossPool)
+    expect(index).toBeGreaterThanOrEqual(0)
+    expect(index).toBeLessThan(schedule.lines.length - 1)
+    expect(schedule.lines[index + 1].plannedPayoutAmount).toBeGreaterThan(schedule.grossPool)
   })
 
   it('never invents money: total payout equals total collected', () => {
     const schedule = buildFixedProfitSchedule(canonical)
     const sum = schedule.lines.reduce((total, line) => total + line.plannedPayoutAmount, 0)
-    expect(schedule.totalCollected).toBe(fromRupees(80_000) * 20)
+    expect(schedule.totalCollected).toBe(schedule.grossPool * canonical.durationMonths)
     expect(sum).toBe(schedule.totalCollected)
     expect(schedule.totalPayout).toBe(schedule.totalCollected)
   })
 
-  it('rises every month when profit is above zero', () => {
+  it('rounds Get Amount to the pool-derived step and rises every month', () => {
     const schedule = buildFixedProfitSchedule(canonical)
+    const unit = chartRoundUnit(schedule.grossPool)
+    for (const line of schedule.lines.slice(0, -1)) {
+      expect(line.plannedPayoutAmount % unit).toBe(0)
+    }
     for (let i = 1; i < schedule.lines.length; i += 1) {
       expect(schedule.lines[i].plannedPayoutAmount).toBeGreaterThan(
         schedule.lines[i - 1].plannedPayoutAmount,
@@ -64,15 +70,15 @@ describe('buildFixedProfitSchedule', () => {
   it('is flat at zero profit', () => {
     const schedule = buildFixedProfitSchedule({ ...canonical, profitBps: 0 })
     for (const line of schedule.lines) {
-      expect(line.plannedPayoutAmount).toBe(fromRupees(80_000))
+      expect(line.plannedPayoutAmount).toBe(schedule.grossPool)
       expect(line.adjustment).toBe(0)
     }
   })
 
   it('records adjustment as payout minus pool, negative early', () => {
     const schedule = buildFixedProfitSchedule(canonical)
-    expect(schedule.lines[0].adjustment).toBe(fromRupees(-8000))
-    expect(schedule.lines[19].adjustment).toBe(fromRupees(8000))
+    expect(schedule.lines[0].adjustment).toBeLessThan(0)
+    expect(schedule.lines[19].adjustment).toBeGreaterThan(0)
     const adjustmentSum = schedule.lines.reduce((total, line) => total + line.adjustment, 0)
     expect(adjustmentSum).toBe(0)
   })

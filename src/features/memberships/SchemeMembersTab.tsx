@@ -54,7 +54,7 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
     }
     return map
   }, [rows])
-  const rosterFull = activeCount >= scheme.maxMembers
+  const rosterReady = activeCount >= scheme.maxMembers
   const editable = scheme.status === 'draft' || scheme.status === 'active'
 
   async function assignCashier(membershipId: string, cashierId: string) {
@@ -104,7 +104,11 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
             {activeCount}/{scheme.maxMembers}
           </span>{' '}
           active members
-          {rosterFull ? ' — the roster is full' : ''}
+          {scheme.status === 'draft'
+            ? rosterReady
+              ? ' — enough to activate; you can still add more'
+              : ` — add at least ${scheme.maxMembers} to activate`
+            : ''}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {cashiers.map((cashier) => (
@@ -135,7 +139,7 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
             </>
           )}
           {editable && (
-            <Button onClick={() => setAddOpen(true)} disabled={rosterFull}>
+            <Button onClick={() => setAddOpen(true)}>
               <PlusIcon /> Add member
             </Button>
           )}
@@ -146,7 +150,7 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
         <EmptyState
           icon={UsersIcon}
           title="No members assigned"
-          description={`Assign up to ${scheme.maxMembers} members to this scheme. Only admins can see this list.`}
+          description={`Assign at least ${scheme.maxMembers} members to activate this scheme. You can add more. Only admins can see this list.`}
           action={
             editable ? (
               <Button onClick={() => setAddOpen(true)}>

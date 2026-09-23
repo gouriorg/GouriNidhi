@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { AlertTriangleIcon, ArrowLeftIcon, InfoIcon, LoaderCircleIcon, SaveIcon } from 'lucide-react'
+import { ArrowLeftIcon, InfoIcon, LoaderCircleIcon, SaveIcon } from 'lucide-react'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -19,8 +19,10 @@ import { schemeFormSchema, type SchemeFormValues } from '@/db/schema'
 import {
   buildFixedProfitSchedule,
   canBuildSchedule,
+  profitBpsFromChart,
+  type Schedule,
 } from '@/domain/distribution/fixedProfitSchedule'
-import { fromRupees, percentToBps, toRupees } from '@/domain/money/money'
+import { bpsToPercent, fromRupees, percentToBps, toRupees } from '@/domain/money/money'
 import { PayoutScheduleChart } from '@/features/schemes/PayoutScheduleChart'
 import { PayoutScheduleTable } from '@/features/schemes/PayoutScheduleTable'
 import { todayIso } from '@/lib/dates'
@@ -57,6 +59,7 @@ function SchemeForm({
   onSaved: (id: string) => void
 }) {
   const locked = scheme ? isFinancialsLocked(scheme) : false
+  const customChart = scheme?.distributionMode === 'custom' && (scheme.scheduleSnapshot?.length ?? 0) > 0
   const existingSchemes = useLiveQuery(() => schemesRepository.list(), [])
   const nextCode = nextGnSchemeCode((existingSchemes ?? []).map((row) => row.code))
   const assignedCode = scheme?.code ?? nextCode
@@ -79,8 +82,28 @@ function SchemeForm({
 
   const values = form.watch()
 
-  // Live preview: recompute the schedule on every valid keystroke.
-  const preview = useMemo(() => {
+  const preview = useMemo((): Schedule | null => {
+    if (customChart && scheme?.scheduleSnapshot?.length) {
+      const monthlyPaise = fromRupees(Number(values.monthlyAmountRupees) || 0)
+      const members = Number(values.maxMembers)
+      const pool =
+        Number.isInteger(monthlyPaise) && monthlyPaise > 0 && Number.isInteger(members) && members > 0
+          ? monthlyPaise * members
+          : (scheme.scheduleSnapshot[0]?.grossPool ?? 0)
+      const lines = scheme.scheduleSnapshot.map((line) => ({
+        ...line,
+        grossPool: pool,
+        adjustment: line.plannedPayoutAmount - pool,
+      }))
+      const totalPayout = lines.reduce((sum, line) => sum + line.plannedPayoutAmount, 0)
+      return {
+        lines,
+        grossPool: pool,
+        totalCollected: pool * lines.length,
+        totalPayout,
+      }
+    }
+
     const maxMembers = Number(values.maxMembers)
     const durationMonths = Number(values.durationMonths)
     const collectionDay = Number(values.collectionDay)
@@ -113,6 +136,8 @@ function SchemeForm({
       return null
     }
   }, [
+    customChart,
+    scheme?.scheduleSnapshot,
     values.maxMembers,
     values.durationMonths,
     values.collectionDay,
@@ -121,10 +146,21 @@ function SchemeForm({
     values.startDate,
   ])
 
-  const durationMismatch =
-    Number(values.durationMonths) !== Number(values.maxMembers) &&
-    Number.isFinite(Number(values.durationMonths)) &&
-    Number.isFinite(Number(values.maxMembers))
+  const impliedProfitPercent = useMemo(() => {
+    if (!preview?.lines.length || preview.grossPool <= 0) return null
+    const first = preview.lines[0].plannedPayoutAmount
+    const last = preview.lines[preview.lines.length - 1].plannedPayoutAmount
+    return bpsToPercent(profitBpsFromChart(preview.grossPool, first, last))
+  }, [preview])
+
+  function syncMembersAndDuration(source: 'maxMembers' | 'durationMonths', raw: string) {
+    if (locked) return
+    const value = Number(raw)
+    if (!Number.isFinite(value)) return
+    const other = source === 'maxMembers' ? 'durationMonths' : 'maxMembers'
+    if (Number(form.getValues(other)) === value) return
+    form.setValue(other, value, { shouldDirty: true, shouldValidate: true })
+  }
 
   async function onSubmit(raw: SchemeFormValues) {
     const parsed = schemeFormSchema.parse(raw)
@@ -133,10 +169,13 @@ function SchemeForm({
       description: parsed.description || undefined,
       monthlyAmount: fromRupees(parsed.monthlyAmountRupees),
       maxMembers: parsed.maxMembers,
-      durationMonths: parsed.durationMonths,
+      durationMonths: locked ? parsed.durationMonths : parsed.maxMembers,
       startDate: parsed.startDate,
       collectionDay: parsed.collectionDay,
-      profitBps: percentToBps(parsed.profitPercent),
+      profitBps:
+        customChart && impliedProfitPercent !== null
+          ? percentToBps(impliedProfitPercent)
+          : percentToBps(parsed.profitPercent),
       notes: parsed.notes || undefined,
     }
 
@@ -146,8 +185,10 @@ function SchemeForm({
       ? {
           name: input.name,
           description: input.description,
+          monthlyAmount: input.monthlyAmount,
           collectionDay: input.collectionDay,
           notes: input.notes,
+          ...(customChart ? { profitBps: input.profitBps } : {}),
         }
       : input
 
@@ -181,16 +222,20 @@ function SchemeForm({
             </Badge>
           </span>
         }
-        description="Enter the plan below. The monthly payout schedule is calculated for you as you type. The scheme code is assigned automatically and cannot be changed."
+        description={
+          customChart
+            ? 'This scheme uses the printed payout chart. Amounts stay as on the chart.'
+            : 'Enter the plan below. The monthly payout schedule is calculated for you as you type. The scheme code is assigned automatically and cannot be changed.'
+        }
       />
 
       {locked && (
         <div className="border-warning/35 bg-warning/10 text-warning-foreground mb-6 flex gap-2 rounded-lg border p-3 text-sm">
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
           <p>
-            This scheme is active. Member count, monthly contribution, duration, start date and
-            profit are locked so the agreed payout schedule cannot change. Name, notes and the
-            monthly due day can still be edited.
+            {customChart
+              ? 'This scheme is active and follows the printed payout chart. Member count, duration and start date stay locked. Monthly contribution and due day can still be edited. Get Amount stays as on the chart; profit % is recalculated from first vs last payout against the new monthly pool.'
+              : 'This scheme is active. Member count, duration, start date and profit stay locked. You can still set the monthly contribution so a running scheme can be filled in. Unpaid months and the payout preview update to the new amount. Paid months are left as recorded.'}
           </p>
         </div>
       )}
@@ -223,11 +268,13 @@ function SchemeForm({
               <CardHeader>
                 <CardTitle>The plan</CardTitle>
                 <CardDescription>
-                  These five inputs decide the payout schedule.
+                  {customChart
+                    ? 'Monthly contribution and due day can be edited. The payout chart stays as printed.'
+                    : 'These five inputs decide the payout schedule.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 items-start gap-4">
                   <Field
                     id="maxMembers"
                     label="Number of members"
@@ -238,7 +285,9 @@ function SchemeForm({
                       type="number"
                       inputMode="numeric"
                       min={2}
-                      {...form.register('maxMembers')}
+                      {...form.register('maxMembers', {
+                        onChange: (event) => syncMembersAndDuration('maxMembers', event.target.value),
+                      })}
                       disabled={locked}
                     />
                   </Field>
@@ -247,13 +296,17 @@ function SchemeForm({
                     id="durationMonths"
                     label="Duration (months)"
                     error={form.formState.errors.durationMonths?.message}
+                    hint="Same as the member count so each member can take one month."
                   >
                     <Input
                       id="durationMonths"
                       type="number"
                       inputMode="numeric"
                       min={1}
-                      {...form.register('durationMonths')}
+                      {...form.register('durationMonths', {
+                        onChange: (event) =>
+                          syncMembersAndDuration('durationMonths', event.target.value),
+                      })}
                       disabled={locked}
                     />
                   </Field>
@@ -263,7 +316,11 @@ function SchemeForm({
                   id="monthlyAmountRupees"
                   label="Monthly contribution per member (₹)"
                   error={form.formState.errors.monthlyAmountRupees?.message}
-                  hint="Everyone pays this same amount every month."
+                  hint={
+                    locked
+                      ? 'You can still fill this on a running scheme. Unpaid months use the new amount.'
+                      : 'Everyone pays this same amount every month.'
+                  }
                 >
                   <Input
                     id="monthlyAmountRupees"
@@ -272,11 +329,10 @@ function SchemeForm({
                     min={1}
                     step="0.01"
                     {...form.register('monthlyAmountRupees')}
-                    disabled={locked}
                   />
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 items-start gap-4">
                   <Field
                     id="startDate"
                     label="Start date"
@@ -307,40 +363,44 @@ function SchemeForm({
                   </Field>
                 </div>
 
-                <Field
-                  id="profitPercent"
-                  label="Profit (%)"
-                  error={form.formState.errors.profitPercent?.message}
-                  hint="Spread between the first and last withdrawal. 0% pays everyone the same."
-                >
-                  <Input
+                {customChart ? (
+                  <Field
                     id="profitPercent"
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    max={100}
-                    step="0.5"
-                    {...form.register('profitPercent')}
-                    disabled={locked}
-                  />
-                </Field>
+                    label="Profit (%)"
+                    hint="From this chart: half the gap between first and last Get Amount, as a share of the monthly pool. Recalculates when you change the monthly contribution."
+                  >
+                    <input type="hidden" {...form.register('profitPercent')} />
+                    <Input
+                      id="profitPercentDisplay"
+                      readOnly
+                      value={impliedProfitPercent === null ? '' : String(impliedProfitPercent)}
+                    />
+                  </Field>
+                ) : (
+                  <Field
+                    id="profitPercent"
+                    label="Profit (%)"
+                    error={form.formState.errors.profitPercent?.message}
+                    hint="Spread between the first and last withdrawal. 0% pays everyone the same."
+                  >
+                    <Input
+                      id="profitPercent"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={100}
+                      step="0.5"
+                      {...form.register('profitPercent')}
+                      disabled={locked}
+                    />
+                  </Field>
+                )}
 
                 <Field id="notes" label="Notes (optional)">
                   <Textarea id="notes" rows={2} {...form.register('notes')} />
                 </Field>
               </CardContent>
             </Card>
-
-            {durationMismatch && (
-              <div className="border-warning/35 bg-warning/10 text-warning-foreground flex gap-2 rounded-lg border p-3 text-sm">
-                <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-                <p>
-                  Duration ({String(values.durationMonths)} months) does not match the member count
-                  ({String(values.maxMembers)}). A rotating chit normally pays one member per month,
-                  so some members would get no month or share one.
-                </p>
-              </div>
-            )}
 
             <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? (
@@ -358,8 +418,9 @@ function SchemeForm({
               <CardHeader>
                 <CardTitle>Payout schedule</CardTitle>
                 <CardDescription>
-                  Calculated automatically. Whoever withdraws earlier receives less; the last month
-                  receives the most. Total paid out always equals total collected.
+                  {customChart
+                    ? 'Copied from the 2 Lakh New B.C chart: BC Payment is the monthly contribution, Get Amount is the payout.'
+                    : 'Calculated automatically. Whoever withdraws earlier receives less; the last month receives the most. Total paid out always equals total collected.'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -412,7 +473,7 @@ function Field({
   children: React.ReactNode
 }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid content-start gap-2">
       <Label htmlFor={id}>{label}</Label>
       {children}
       {hint && !error && <p className="text-muted-foreground text-xs">{hint}</p>}

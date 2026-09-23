@@ -296,19 +296,25 @@ export function SchemeDetailPage() {
           <span className="grid gap-2">
             <span>
               This creates all {scheme.durationMonths} monthly rounds from the payout schedule and
-              locks the financial inputs: member count, monthly contribution, duration, start date
-              and profit can no longer change.
+              locks member count, duration, start date and profit. Monthly contribution can still
+              be filled in later if the scheme is already running.
             </span>
-            {understaffed && (
+            {understaffed ? (
               <span className="text-warning-foreground flex gap-2">
                 <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-                Only {stats?.memberCount ?? 0} of {scheme.maxMembers} members are assigned. The
-                schedule still uses the planned {scheme.maxMembers}.
+                Add at least {scheme.maxMembers} members on the Members tab first (
+                {stats?.memberCount ?? 0} assigned). You can add more than {scheme.maxMembers}.
+              </span>
+            ) : (
+              <span>
+                {stats?.memberCount ?? 0} members are on the list (planned {scheme.maxMembers}
+                ). Extra members are allowed.
               </span>
             )}
           </span>
         }
         confirmLabel="Activate scheme"
+        confirmDisabled={understaffed}
         onConfirm={activate}
       />
 

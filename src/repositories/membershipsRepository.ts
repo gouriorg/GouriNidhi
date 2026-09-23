@@ -100,11 +100,6 @@ export const membershipsRepository = {
       return reactivated
     }
 
-    const activeCount = await membershipsRepository.countActive(schemeId)
-    if (activeCount >= scheme.maxMembers) {
-      throw new RepositoryError(`${scheme.code} already has its full ${scheme.maxMembers} members.`)
-    }
-
     const allRows = await membershipsRepository.listForScheme(schemeId)
     const nextNumber = allRows.reduce((max, row) => Math.max(max, row.memberNumber), 0) + 1
     const timestamp = nowIso()
@@ -280,12 +275,6 @@ export const membershipsRepository = {
       peopleRepository.get(before.personId),
       schemesRepository.get(before.schemeId),
     ])
-    if (status === 'active' && scheme) {
-      const activeCount = await membershipsRepository.countActive(before.schemeId)
-      if (activeCount >= scheme.maxMembers) {
-        throw new RepositoryError(`${scheme.code} already has its full ${scheme.maxMembers} members.`)
-      }
-    }
     const updated: SchemeMember = { ...before, status, updatedAt: nowIso() }
     const { error: updateError } = await getSupabase()
       .from('scheme_members')

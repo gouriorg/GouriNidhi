@@ -5,8 +5,20 @@ import {
   getDistributionStrategy,
   listDistributionStrategies,
 } from '@/domain/distribution/registry'
+import { buildFixedProfitSchedule } from '@/domain/distribution/fixedProfitSchedule'
 import { NotImplementedError, type DistributionInput } from '@/domain/distribution/types'
 import { fromRupees } from '@/domain/money/money'
+
+function expectedSchedule() {
+  return buildFixedProfitSchedule({
+    maxMembers: input.memberCount,
+    monthlyAmount: Math.round(input.grossPool / input.memberCount),
+    durationMonths: input.durationMonths,
+    startDate: '2000-01-01',
+    collectionDay: 1,
+    profitBps: input.profitBps,
+  })
+}
 
 const input: DistributionInput = {
   grossPool: fromRupees(80_000),
@@ -28,8 +40,11 @@ describe('distribution registry', () => {
 
   it('previews the same amounts as the schedule builder', () => {
     const strategy = getDistributionStrategy('fixed_profit')
-    expect(strategy.preview(input).payoutAmount).toBe(fromRupees(72_000))
-    expect(strategy.preview({ ...input, monthNumber: 20 }).payoutAmount).toBe(fromRupees(88_000))
+    const schedule = expectedSchedule()
+    expect(strategy.preview(input).payoutAmount).toBe(schedule.lines[0].plannedPayoutAmount)
+    expect(strategy.preview({ ...input, monthNumber: input.durationMonths }).payoutAmount).toBe(
+      schedule.lines[input.durationMonths - 1].plannedPayoutAmount,
+    )
     expect(strategy.preview(input).autoCalculated).toBe(true)
   })
 
@@ -47,7 +62,9 @@ describe('distribution registry', () => {
 
     // The fixed-profit schedule for other months is unchanged.
     const fixed = getDistributionStrategy('fixed_profit')
-    expect(fixed.preview({ ...input, monthNumber: 20 }).payoutAmount).toBe(fromRupees(88_000))
+    expect(fixed.preview({ ...input, monthNumber: input.durationMonths }).payoutAmount).toBe(
+      expectedSchedule().lines[input.durationMonths - 1].plannedPayoutAmount,
+    )
   })
 
   it('requires an amount in manual mode', () => {
