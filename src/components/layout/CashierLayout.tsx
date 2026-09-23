@@ -22,10 +22,10 @@ export function CashierLayout() {
   const showMyAccount = (memberships?.length ?? 0) > 0
 
   return (
-    <div className="bg-background min-h-dvh">
+    <div className="bg-background flex min-h-dvh flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-between gap-3 px-4">
-          <BrandLockup showSubtitle={false} />
+        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
+          <BrandLockup />
           <div className="flex items-center gap-1">
             <OfflineBadge />
             <ThemeToggle />
@@ -35,54 +35,51 @@ export function CashierLayout() {
           </div>
         </div>
         {isCashierSession(session) && (
-          <nav aria-label="Cashier" className="mx-auto flex h-11 max-w-3xl items-center gap-4 px-4">
-            <NavLink
-              to="/collect"
-              end
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-1.5 text-sm font-medium',
-                  isActive ? 'text-foreground' : 'text-muted-foreground',
-                )
-              }
-            >
-              <WalletIcon className="size-4" />
-              Members
-            </NavLink>
-            <NavLink
-              to="/collect/payouts"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-1.5 text-sm font-medium',
-                  isActive ? 'text-foreground' : 'text-muted-foreground',
-                )
-              }
-            >
-              <BanknoteIcon className="size-4" />
-              Handover
-            </NavLink>
-            {showMyAccount && (
-              <NavLink
-                to="/me"
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-1.5 text-sm font-medium',
-                    isActive ? 'text-foreground' : 'text-muted-foreground',
-                  )
-                }
-              >
-                <UserIcon className="size-4" />
-                My account
-              </NavLink>
-            )}
+          <nav
+            aria-label="Cashier"
+            className="mx-auto flex h-12 w-full max-w-5xl items-center gap-1 px-4"
+          >
+            <CashierNavLink to="/collect" end icon={WalletIcon} label="Members" />
+            <CashierNavLink to="/collect/payouts" icon={BanknoteIcon} label="Handover" />
+            {showMyAccount && <CashierNavLink to="/me" icon={UserIcon} label="My account" />}
           </nav>
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-3xl px-4 py-6 pb-24">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24">
         <Outlet />
       </main>
       <SiteFooter />
     </div>
+  )
+}
+
+function CashierNavLink({
+  to,
+  end,
+  label,
+  icon: Icon,
+}: {
+  to: string
+  end?: boolean
+  label: string
+  icon: typeof WalletIcon
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cn(
+          'flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        )
+      }
+    >
+      <Icon className="size-4" />
+      {label}
+    </NavLink>
   )
 }

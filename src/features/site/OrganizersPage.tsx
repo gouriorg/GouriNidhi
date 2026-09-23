@@ -2,7 +2,7 @@ import { CameraIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { LoadingState } from '@/components/EmptyState'
+import { EmptyState, LoadingState } from '@/components/EmptyState'
 import { OrganizerAvatar } from '@/components/OrganizerAvatar'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { organizersPage, type SiteOrganizer } from '@/content/sitePages'
+import { isOrganizerNameFilled, organizersPage, type SiteOrganizer } from '@/content/sitePages'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { imageFileToJpegDataUrl } from '@/lib/organizerPhoto'
 import { toReadableError } from '@/repositories/errors'
@@ -40,14 +40,22 @@ export function OrganizersPage() {
         }
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        {people.map((person) =>
-          isAdmin ? (
-            <OrganizerEditor key={person.id} person={person} photo={photos[person.id]} people={people} />
-          ) : (
-            <OrganizerCard key={person.id} person={person} photo={photos[person.id]} />
-          ),
-        )}
+        {isAdmin
+          ? people.map((person) => (
+              <OrganizerEditor key={person.id} person={person} photo={photos[person.id]} people={people} />
+            ))
+          : people
+              .filter((person) => isOrganizerNameFilled(person.name))
+              .map((person) => (
+                <OrganizerCard key={person.id} person={person} photo={photos[person.id]} />
+              ))}
       </div>
+      {!isAdmin && people.every((person) => !isOrganizerNameFilled(person.name)) ? (
+        <EmptyState
+          title="No organizers listed yet"
+          description="The admin has not published organizer names."
+        />
+      ) : null}
     </>
   )
 }

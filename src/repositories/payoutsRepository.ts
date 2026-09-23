@@ -310,11 +310,15 @@ async function refreshRoundWinners(roundId: string): Promise<void> {
   const round = mapRound(roundRow)
   const winners = await payoutsRepository.listForRound(roundId)
   const allPaid = winners.length > 0 && winners.every((row) => row.status === 'paid')
+  const frozen =
+    round.status === 'closed' || round.status === 'upcoming' || round.status === 'collection_open'
   let status = round.status
-  if (round.status !== 'closed' && round.status !== 'upcoming' && round.status !== 'collection_open') {
-    status = allPaid ? 'payout_complete' : winners.length > 0 ? 'payout_pending' : round.status === 'payout_complete' || round.status === 'payout_pending' ? 'collection_complete' : round.status
-  } else if (winners.length > 0 && (round.status === 'collection_complete' || round.status === 'payout_pending')) {
-    status = allPaid ? 'payout_complete' : 'payout_pending'
+  if (!frozen) {
+    if (allPaid) status = 'payout_complete'
+    else if (winners.length > 0) status = 'payout_pending'
+    else if (round.status === 'payout_complete' || round.status === 'payout_pending') {
+      status = 'collection_complete'
+    }
   }
 
   const { error } = await getSupabase()

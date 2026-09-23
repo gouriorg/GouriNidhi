@@ -16,6 +16,13 @@ export type SiteOrganizer = {
   notes: string
 }
 
+/** Members and cashiers only see organizers whose name has been filled in. */
+export function isOrganizerNameFilled(name: string): boolean {
+  const trimmed = name.trim()
+  if (!trimmed) return false
+  return !(trimmed.startsWith('[') && trimmed.endsWith(']'))
+}
+
 export type SiteTermsSection = {
   heading: string
   body: string
@@ -58,27 +65,27 @@ export const defaultOrganizers: SiteOrganizer[] = [
 ]
 
 export const defaultTerms: SiteTerms = {
-  updatedLabel: 'Last updated: [date]',
+  updatedLabel: 'Last updated: 23 Sep 2026',
   sections: [
     {
-      heading: '1. About these terms',
-      body: 'These terms will describe how members join a scheme, contribute each month, and receive a payout.',
+      heading: '1. Monthly payment',
+      body: 'Every member must transfer their monthly contribution before the 10th of each month. Payment can be made via UPI or cash.',
     },
     {
-      heading: '2. Membership',
-      body: 'Explain eligibility, how a member is added, and that the mobile number is used to sign in.',
+      heading: '2. No volunteer for payout',
+      body: 'If no member is willing to take the monthly payout, a lottery will be conducted. The selected member will receive the amount via UPI or cash.',
     },
     {
-      heading: '3. Contributions and payouts',
-      body: 'Explain the monthly contribution, the rotating payout schedule, and that GouriNidhi does not take payments through a gateway.',
+      heading: '3. Multiple volunteers',
+      body: 'If more than one member is interested in taking the payout, a lottery system will be used. The member whose name is picked will receive the payout.',
     },
     {
-      heading: '4. Organizer role',
-      body: 'Explain what the organizer records, what members can see, and how disputes are handled.',
+      heading: '4. Intimation for payout',
+      body: 'Members who are interested in taking the payout must inform the organizer at least one month in advance.',
     },
     {
-      heading: '5. Records',
-      body: 'Explain that schemes can be deactivated but records are kept.',
+      heading: '5. Monthly payout',
+      body: 'The payout will be distributed around the 20th of every month, as per the predefined chart. All members must follow the payout structure strictly.',
     },
   ],
 }

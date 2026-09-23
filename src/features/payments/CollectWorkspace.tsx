@@ -19,11 +19,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { CashierCollectRow, CashierDashboard, CashierMonthCell } from '@/features/dashboard/cashier/cashierDashboardService'
-import { formatDisplayDate, formatShortMonth, todayIso } from '@/lib/dates'
+import { formatDisplayDate, formatShortMonth, lastDayOfMonthIso } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { toReadableError } from '@/repositories/errors'
 import type { PaymentStatusInput } from '@/repositories/paymentsRepository'
-import { AlertTriangleIcon, BanknoteIcon, CalendarCheckIcon, UsersIcon, WalletIcon } from 'lucide-react'
+import { AlertTriangleIcon, BanknoteIcon, CalendarCheckIcon, SearchIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
 export function CollectWorkspace({
   title,
@@ -95,9 +95,14 @@ export function CollectWorkspace({
   return (
     <>
       <PageHeader title={title} description={description} />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatCard label={membersLabel} value={data.assignedCount} icon={UsersIcon} />
-        <StatCard label="Collected (due now)" value={<MoneyText amount={data.collectedOpen} />} tone="success" icon={WalletIcon} />
+        <StatCard
+          label="Collected (due now)"
+          value={<MoneyText amount={data.collectedOpen} />}
+          tone="success"
+          icon={WalletIcon}
+        />
         <StatCard
           label="Still to collect"
           value={<MoneyText amount={data.pendingOpen} />}
@@ -115,6 +120,7 @@ export function CollectWorkspace({
           value={data.advanceCount}
           hint="Months marked paid before the due day"
           icon={CalendarCheckIcon}
+          className="col-span-2 lg:col-span-1"
         />
       </div>
 
@@ -138,38 +144,57 @@ export function CollectWorkspace({
           {schemes.map((scheme) => (
             <TabsContent key={scheme.id} value={scheme.id}>
               <p className="text-muted-foreground mb-3 text-sm">{scheme.name}</p>
-              <Input
-                className="mb-3 max-w-sm"
-                placeholder="Search member name or mobile"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setMemberId(undefined)
-                }}
-              />
+              <div className="relative mb-4 max-w-md">
+                <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search member name or mobile"
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    setMemberId(undefined)
+                  }}
+                  aria-label="Search members"
+                />
+              </div>
               {members.length === 0 ? (
                 <EmptyState title="No members in this scheme" />
               ) : (
-                <Tabs value={activeMemberId} onValueChange={setMemberId}>
-                  <TabsList>
-                    {members.map((row) => (
-                      <TabsTrigger key={row.membership.id} value={row.membership.id}>
-                        {row.person.fullName}
-                        {row.overdue ? ' · overdue' : ''}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  {members.map((row) => (
-                    <TabsContent key={row.membership.id} value={row.membership.id}>
+                <div className="grid gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    {members.map((row) => {
+                      const selected = row.membership.id === activeMemberId
+                      return (
+                        <button
+                          key={row.membership.id}
+                          type="button"
+                          onClick={() => setMemberId(row.membership.id)}
+                          className={cn(
+                            'rounded-full border px-3 py-1.5 text-left text-sm font-medium transition-colors',
+                            selected
+                              ? 'bg-primary text-primary-foreground border-transparent'
+                              : 'bg-card hover:bg-muted',
+                            !selected && row.overdue && 'border-destructive/40 text-destructive',
+                          )}
+                        >
+                          {row.person.fullName}
+                          {row.overdue ? ' · overdue' : ''}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {members
+                    .filter((row) => row.membership.id === activeMemberId)
+                    .map((row) => (
                       <MemberMonths
+                        key={row.membership.id}
                         row={row}
                         busyKey={busyKey}
                         onPaid={(cell) => setPayTarget({ row, cell })}
                         onUnpaid={(cell) => void setUnpaid(row, cell)}
                       />
-                    </TabsContent>
-                  ))}
-                </Tabs>
+                    ))}
+                </div>
               )}
             </TabsContent>
           ))}
@@ -289,11 +314,15 @@ function PaidDateDialog({
   onClose: () => void
   onSetStatus: (input: PaymentStatusInput) => Promise<void>
 }) {
-  const [paidDate, setPaidDate] = useState(todayIso())
+  const [paidDate, setPaidDate] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    setPaidDate(target?.cell.payment?.paidDate ?? todayIso())
+    if (!target) {
+      setPaidDate('')
+      return
+    }
+    setPaidDate(target.cell.payment?.paidDate ?? lastDayOfMonthIso(target.cell.round.dueDate))
   }, [target])
 
   async function save() {
@@ -329,7 +358,7 @@ function PaidDateDialog({
           <DialogTitle>Paid on</DialogTitle>
           <DialogDescription>
             {target
-              ? `${target.row.person.fullName} · ${formatShortMonth(target.cell.round.dueDate)}. Enter the date you received the cash.`
+              ? `${target.row.person.fullName} · ${formatShortMonth(target.cell.round.dueDate)}. Defaults to the last day of that month; you can pick another date.`
               : null}
           </DialogDescription>
         </DialogHeader>
@@ -339,7 +368,6 @@ function PaidDateDialog({
             id="collect-paid-date"
             type="date"
             value={paidDate}
-            max={todayIso()}
             onChange={(event) => setPaidDate(event.target.value)}
           />
         </div>
