@@ -16,6 +16,7 @@ import { StatCard } from '@/components/StatCard'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PayoutScheduleChart } from '@/features/schemes/PayoutScheduleChart'
+import { isOrganizerNameFilled } from '@/content/sitePages'
 import { loadMemberHome } from '@/features/dashboard/member/memberHomeService'
 import { OrganizerAvatar } from '@/components/OrganizerAvatar'
 import { formatDisplayDate, formatShortMonth } from '@/lib/dates'
@@ -266,13 +267,14 @@ export function MemberHomePage() {
 function OrganizersStrip() {
   const people = useLiveQuery(() => siteContentRepository.listOrganizers(), [])
   const photos = useLiveQuery(() => organizersRepository.listPhotos(), []) ?? {}
-  if (!people?.length) return null
+  const named = people?.filter((person) => isOrganizerNameFilled(person.name)) ?? []
+  if (!named.length) return null
 
   return (
     <section className="grid gap-3">
       <h2 className="text-lg font-semibold">Organizers</h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {people.map((person) => (
+        {named.map((person) => (
           <Card key={person.id}>
             <CardContent className="flex items-center gap-4 pt-6">
               <OrganizerAvatar name={person.name} photo={photos[person.id]} className="size-16 text-base" />

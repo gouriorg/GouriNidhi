@@ -1,4 +1,4 @@
-import { addMonths, format, isValid, parseISO, startOfDay } from 'date-fns'
+import { addMonths, endOfMonth, format, isValid, parseISO, startOfDay } from 'date-fns'
 
 import type { DateOnly } from '@/types/entities'
 
@@ -38,6 +38,12 @@ export function formatMonthLabel(value: DateOnly): string {
 export function formatShortMonth(value?: DateOnly): string {
   if (!value || !isValidDateOnly(value)) return '—'
   return format(parseDateOnly(value), 'MMM yy')
+}
+
+/** Last calendar day of the month that contains this date, as `yyyy-MM-dd`. */
+export function lastDayOfMonthIso(value: DateOnly): DateOnly {
+  if (!isValidDateOnly(value)) return value
+  return format(endOfMonth(parseDateOnly(value)), DATE_FORMAT)
 }
 
 export function formatDisplayDateTime(iso: string): string {

@@ -36,7 +36,7 @@ export function StatCard({
           </span>
         )}
       </div>
-      <div className="tabular font-[family-name:var(--font-display)] text-2xl font-bold break-words">
+      <div className="tabular font-[family-name:var(--font-display)] text-xl font-bold whitespace-nowrap sm:text-2xl">
         {value}
       </div>
       {hint && <p className="text-muted-foreground text-xs">{hint}</p>}

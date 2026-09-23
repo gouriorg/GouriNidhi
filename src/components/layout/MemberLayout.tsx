@@ -16,10 +16,10 @@ export function MemberLayout() {
   const cashier = isCashierSession(session)
 
   return (
-    <div className="bg-background min-h-dvh">
+    <div className="bg-background flex min-h-dvh flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-between gap-3 px-4">
-          <BrandLockup showSubtitle={false} />
+        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
+          <BrandLockup />
           <div className="flex items-center gap-1">
             <OfflineBadge />
             <ThemeToggle />
@@ -29,42 +29,48 @@ export function MemberLayout() {
           </div>
         </div>
         {cashier && (
-          <nav aria-label="Cashier" className="mx-auto flex h-11 max-w-3xl items-center gap-4 px-4">
-            <NavLink
-              to="/collect"
-              className={({ isActive }) =>
-                cn('flex items-center gap-1.5 text-sm font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')
-              }
-            >
-              <WalletIcon className="size-4" />
-              Collect
-            </NavLink>
-            <NavLink
-              to="/collect/payouts"
-              className={({ isActive }) =>
-                cn('flex items-center gap-1.5 text-sm font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')
-              }
-            >
-              <BanknoteIcon className="size-4" />
-              Handover
-            </NavLink>
-            <NavLink
-              to="/me"
-              className={({ isActive }) =>
-                cn('flex items-center gap-1.5 text-sm font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')
-              }
-            >
-              <UserIcon className="size-4" />
-              My account
-            </NavLink>
+          <nav
+            aria-label="Cashier"
+            className="mx-auto flex h-12 w-full max-w-5xl items-center gap-1 px-4"
+          >
+            <MemberNavLink to="/collect" icon={WalletIcon} label="Collect" />
+            <MemberNavLink to="/collect/payouts" icon={BanknoteIcon} label="Handover" />
+            <MemberNavLink to="/me" icon={UserIcon} label="My account" />
           </nav>
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-3xl px-4 py-6 pb-24">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24">
         <Outlet />
       </main>
       <SiteFooter />
     </div>
+  )
+}
+
+function MemberNavLink({
+  to,
+  label,
+  icon: Icon,
+}: {
+  to: string
+  label: string
+  icon: typeof WalletIcon
+}) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          'flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        )
+      }
+    >
+      <Icon className="size-4" />
+      {label}
+    </NavLink>
   )
 }
