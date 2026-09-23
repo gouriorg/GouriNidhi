@@ -147,16 +147,17 @@ async function loadCollectDashboard(memberships: SchemeMember[]): Promise<Cashie
     ['collection_open', 'collection_complete', 'payout_pending'].includes(round.status),
   )
   for (const round of activeRounds) {
-    const payout = await payoutsRepository.getForRound(round.id)
-    if (!payout) continue
-    const assigned = memberships.find(
-      (row) => row.schemeId === round.schemeId && row.personId === payout.personId,
-    )
-    if (!assigned) continue
-    const person = personById.get(payout.personId)
-    const scheme = schemeById.get(round.schemeId)
-    if (!person || !scheme) continue
-    handovers.push({ scheme, round, payout, person })
+    const winners = await payoutsRepository.listForRound(round.id)
+    for (const payout of winners) {
+      const assigned = memberships.find(
+        (row) => row.schemeId === round.schemeId && row.personId === payout.personId,
+      )
+      if (!assigned) continue
+      const person = personById.get(payout.personId)
+      const scheme = schemeById.get(round.schemeId)
+      if (!person || !scheme) continue
+      handovers.push({ scheme, round, payout, person })
+    }
   }
 
   return {

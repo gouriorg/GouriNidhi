@@ -1,6 +1,6 @@
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { AlertTriangleIcon, InfoIcon, TrophyIcon } from 'lucide-react'
-import { useState } from 'react'
+import { AlertTriangleIcon, InfoIcon, PlusIcon, TrophyIcon, XIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -18,294 +18,229 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { roundsRepository } from '@/repositories/roundsRepository'
-import { getDistributionStrategy } from '@/domain/distribution/registry'
-import { fromRupees, toRupees } from '@/domain/money/money'
-import { paymentMethodLabels } from '@/lib/constants'
 import { formatShortMonth, todayIso } from '@/lib/dates'
 import { membershipsRepository } from '@/repositories/membershipsRepository'
 import { payoutsRepository } from '@/repositories/payoutsRepository'
+import { roundsRepository } from '@/repositories/roundsRepository'
 import { toReadableError } from '@/repositories/errors'
-import type { PaymentMethod, Round, Scheme } from '@/types/entities'
+import type { PaymentMethod, Payout, Round, Scheme } from '@/types/entities'
 
 export function RoundPayoutTab({ round, scheme }: { round: Round; scheme: Scheme }) {
   const data = useLiveQuery(async () => {
-    const [payout, roster, allPayouts] = await Promise.all([
-      payoutsRepository.getForRound(round.id),
+    const [winners, roster, allPayouts] = await Promise.all([
+      payoutsRepository.listForRound(round.id),
       membershipsRepository.listForSchemeWithPeople(scheme.id),
       payoutsRepository.listForScheme(scheme.id),
     ])
     const alreadyWon = new Set(
-      allPayouts.filter((p) => p.roundId !== round.id).map((p) => p.personId),
+      allPayouts.filter((payout) => payout.roundId !== round.id).map((payout) => payout.personId),
     )
     const plannedTotal = (await roundsRepository.listForScheme(scheme.id)).reduce(
-      (sum, r) => sum + r.plannedPayoutAmount,
+      (sum, item) => sum + item.plannedPayoutAmount,
       0,
     )
-    const actualTotal = allPayouts.reduce((sum, p) => sum + p.payoutAmount, 0)
-    return { payout, roster: roster.filter((r) => r.status === 'active'), alreadyWon, plannedTotal, actualTotal }
+    const actualTotal = allPayouts.reduce((sum, payout) => sum + payout.payoutAmount, 0)
+    return {
+      winners,
+      roster: roster.filter((row) => row.status === 'active'),
+      alreadyWon,
+      plannedTotal,
+      actualTotal,
+    }
   }, [round.id, scheme.id])
 
-  const [personId, setPersonId] = useState<string>('')
-  const [override, setOverride] = useState(false)
-  const [amount, setAmount] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [payTarget, setPayTarget] = useState<Payout | null>(null)
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [paidDate, setPaidDate] = useState(todayIso())
-  const [reference, setReference] = useState('')
-  const [notes, setNotes] = useState('')
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [hydratedFor, setHydratedFor] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!data) return
+    setSelectedIds(data.winners.map((row) => row.personId))
+  }, [round.id, data?.winners.map((row) => row.personId).join(',')])
 
   if (data === undefined) return <LoadingState label="Loading payout…" />
 
-  const { payout, roster, alreadyWon, plannedTotal, actualTotal } = data
-
-  // Prefill once per round from whatever is already saved.
-  if (hydratedFor !== round.id) {
-    setHydratedFor(round.id)
-    setPersonId(payout?.personId ?? round.recipientPersonId ?? '')
-    setOverride(payout ? !payout.autoCalculated : false)
-    setAmount(String(toRupees(payout?.payoutAmount ?? round.plannedPayoutAmount)))
-    setMethod(payout?.method ?? 'cash')
-    setPaidDate(payout?.paidDate ?? todayIso())
-    setReference(payout?.reference ?? '')
-    setNotes(payout?.notes ?? '')
-  }
+  const { winners, roster, alreadyWon, plannedTotal, actualTotal } = data
 
   const locked = round.status === 'closed'
-  const strategy = getDistributionStrategy(override ? 'manual' : 'fixed_profit')
-  const overrideAmount = override && amount ? fromRupees(Number(amount) || 0) : undefined
-  const effectiveAmount = override
-    ? (overrideAmount ?? round.plannedPayoutAmount)
-    : round.plannedPayoutAmount
-  const duplicateWinner = personId !== '' && alreadyWon.has(personId)
-  const isFirstMonth = round.monthNumber === 1
-  const isLastMonth = round.monthNumber === scheme.durationMonths
 
-  async function save(markPaid: boolean) {
-    if (!personId) {
-      toast.error('Choose who receives this month\u2019s payout.')
+  function toggleWinner(personId: string) {
+    const paid = winners.some((row) => row.personId === personId && row.status === 'paid')
+    if (paid) return
+    setSelectedIds((current) =>
+      current.includes(personId) ? current.filter((id) => id !== personId) : [...current, personId],
+    )
+  }
+
+  async function saveWinners() {
+    if (selectedIds.length === 0) {
+      toast.error('Choose at least one member for this month.')
       return
     }
-
-    if (override) {
-      const check = strategy.validate({
-        grossPool: round.expectedCollection,
-        profitBps: scheme.profitBps,
-        memberCount: scheme.maxMembers,
-        durationMonths: scheme.durationMonths,
-        monthNumber: round.monthNumber,
-        overrideAmount,
-      })
-      if (!check.ok) {
-        toast.error(check.message)
-        return
-      }
+    try {
+      await payoutsRepository.saveWinners(round.id, selectedIds)
+      toast.success(
+        selectedIds.length === 1 ? 'Winner saved' : `${selectedIds.length} winners saved`,
+      )
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not save the winners.'))
     }
+  }
 
+  async function removeWinner(payout: Payout) {
+    try {
+      await payoutsRepository.remove(payout.id)
+      setSelectedIds((current) => current.filter((id) => id !== payout.personId))
+      toast.success('Winner removed')
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not remove this winner.'))
+    }
+  }
+
+  async function markPaid() {
+    if (!payTarget) return
     try {
       await payoutsRepository.save({
         roundId: round.id,
-        personId,
-        payoutAmount: effectiveAmount,
-        autoCalculated: !override,
+        personId: payTarget.personId,
+        payoutAmount: payTarget.payoutAmount,
+        autoCalculated: payTarget.autoCalculated,
         paidDate,
         method,
-        reference,
-        notes,
-        markPaid,
+        markPaid: true,
       })
-      toast.success(markPaid ? 'Payout recorded as paid' : 'Recipient saved')
+      toast.success('Payout recorded as paid')
     } catch (error) {
-      toast.error(toReadableError(error, 'Could not save this payout.'))
+      toast.error(toReadableError(error, 'Could not mark this payout paid.'))
     }
   }
+
+  const sharePreview =
+    selectedIds.length > 0 ? Math.floor(round.plannedPayoutAmount / selectedIds.length) : 0
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <Card>
         <CardHeader>
-          <CardTitle>{formatShortMonth(round.dueDate)} payout</CardTitle>
+          <CardTitle>{formatShortMonth(round.dueDate)} winners</CardTitle>
           <CardDescription>
-            {isFirstMonth
-              ? `${formatShortMonth(round.dueDate)} is an early withdrawal, so it pays the lowest amount of the whole scheme.`
-              : isLastMonth
-                ? `${formatShortMonth(round.dueDate)} is the final month, so it pays the highest amount of the whole scheme.`
-                : 'Amounts rise every month: earlier withdrawals receive less, later ones receive more.'}
+            Choose one or more members for this month. The scheduled Get Amount is split between
+            them when you save.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-5">
           <div className="grid gap-2">
-            <Label htmlFor="recipient">Who withdrew this month?</Label>
-            <Select value={personId} onValueChange={setPersonId} disabled={locked}>
-              <SelectTrigger id="recipient" className="w-full">
-                <SelectValue placeholder="Choose a member" />
-              </SelectTrigger>
-              <SelectContent>
-                {roster.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No active members in this scheme
-                  </SelectItem>
-                ) : (
-                  roster.map((row) => (
-                    <SelectItem key={row.personId} value={row.personId}>
-                      #{row.memberNumber} {row.person.fullName}
-                      {alreadyWon.has(row.personId) ? ' — already received' : ''}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {duplicateWinner && (
+            <p className="text-sm font-medium">Who takes this month?</p>
+            {roster.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No active members in this scheme.</p>
+            ) : (
+              <div className="grid gap-1">
+                {roster.map((row) => {
+                  const checked = selectedIds.includes(row.personId)
+                  const prior = alreadyWon.has(row.personId)
+                  const paidHere = winners.some(
+                    (payout) => payout.personId === row.personId && payout.status === 'paid',
+                  )
+                  return (
+                    <label
+                      key={row.personId}
+                      className="hover:bg-muted/60 flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-primary mt-0.5 size-4"
+                        checked={checked}
+                        disabled={locked || paidHere}
+                        onChange={() => toggleWinner(row.personId)}
+                      />
+                      <span>
+                        #{row.memberNumber} {row.person.fullName}
+                        {prior ? (
+                          <span className="text-muted-foreground block text-xs">
+                            Already received a payout in this scheme
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+            {selectedIds.some((id) => alreadyWon.has(id)) && (
               <p className="text-warning-foreground flex gap-2 text-xs">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
-                This member already received a payout in this scheme. Normally each member takes one
-                month. You can still continue.
+                A selected member already received a payout. You can still continue.
               </p>
             )}
           </div>
 
-          <div className="bg-muted/50 grid gap-2 rounded-lg p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Monthly pool</span>
-              <MoneyText amount={round.expectedCollection} />
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {round.plannedPayoutAmount < round.expectedCollection
-                  ? 'Early withdrawal discount'
-                  : 'Late withdrawal bonus'}
-              </span>
-              <MoneyText
-                amount={round.plannedPayoutAmount - round.expectedCollection}
-                signed
-                colored
-              />
-            </div>
-            <div className="border-border mt-1 flex items-center justify-between border-t pt-2 text-base font-semibold">
-              <span>Scheduled payout</span>
+          <div className="bg-muted/50 grid gap-2 rounded-lg p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Scheduled Get Amount</span>
               <MoneyText amount={round.plannedPayoutAmount} />
             </div>
-          </div>
-
-          <label className="flex cursor-pointer items-start gap-3 text-sm">
-            <input
-              type="checkbox"
-              className="accent-primary mt-0.5 size-4"
-              checked={override}
-              disabled={locked}
-              onChange={(event) => {
-                setOverride(event.target.checked)
-                if (!event.target.checked) setAmount(String(toRupees(round.plannedPayoutAmount)))
-              }}
-            />
-            <span>
-              Pay a different amount this month
-              <span className="text-muted-foreground block text-xs">
-                Overrides only this month. The rest of the schedule is unchanged.
-              </span>
-            </span>
-          </label>
-
-          {override && (
-            <div className="grid gap-2">
-              <Label htmlFor="payoutAmount">Amount to pay (₹)</Label>
-              <Input
-                id="payoutAmount"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                disabled={locked}
-              />
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Winners selected</span>
+              <span className="tabular">{selectedIds.length}</span>
             </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="payout-method">Method</Label>
-              <Select
-                value={method}
-                onValueChange={(value) => setMethod(value as PaymentMethod)}
-                disabled={locked}
-              >
-                <SelectTrigger id="payout-method" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(paymentMethodLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="payout-date">Date paid</Label>
-              <Input
-                id="payout-date"
-                type="date"
-                value={paidDate}
-                onChange={(event) => setPaidDate(event.target.value)}
-                disabled={locked}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="payout-reference">Reference (optional)</Label>
-            <Input
-              id="payout-reference"
-              value={reference}
-              onChange={(event) => setReference(event.target.value)}
-              disabled={locked}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="payout-notes">
-              Notes {override && <span className="text-muted-foreground">(reason for override)</span>}
-            </Label>
-            <Textarea
-              id="payout-notes"
-              rows={2}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              disabled={locked}
-            />
+            {selectedIds.length > 1 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Each receives about</span>
+                <MoneyText amount={sharePreview} />
+              </div>
+            )}
           </div>
 
           {!locked && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => save(false)} disabled={!personId}>
-                Save recipient
-              </Button>
-              <Button onClick={() => setConfirmOpen(true)} disabled={!personId}>
-                <TrophyIcon /> Mark paid
-              </Button>
+            <Button onClick={() => void saveWinners()} disabled={selectedIds.length === 0}>
+              <PlusIcon /> Save winners
+            </Button>
+          )}
+
+          {winners.length > 0 && (
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">Saved for this month</p>
+              {winners.map((payout) => {
+                const member = roster.find((row) => row.personId === payout.personId)
+                return (
+                  <div
+                    key={payout.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">
+                        {member?.person.fullName ?? 'Member'}
+                      </p>
+                      <MoneyText amount={payout.payoutAmount} className="text-muted-foreground text-xs" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <PayoutStatusBadge status={payout.status} />
+                      {!locked && payout.status !== 'paid' && (
+                        <>
+                          <Button size="sm" onClick={() => setPayTarget(payout)}>
+                            <TrophyIcon /> Mark paid
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void removeWinner(payout)}
+                            aria-label="Remove winner"
+                          >
+                            <XIcon />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
       <div className="grid content-start gap-4">
-        {payout && (
-          <Card className="gap-3 p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Recorded payout</span>
-              <PayoutStatusBadge status={payout.status} />
-            </div>
-            <MoneyText amount={payout.payoutAmount} className="text-2xl font-bold" />
-            {!payout.autoCalculated && (
-              <p className="text-warning-foreground text-xs">Manual amount, not the schedule.</p>
-            )}
-          </Card>
-        )}
-
         <Card className="gap-2 p-5 text-sm">
           <p className="font-semibold">Scheme running total</p>
           <div className="flex justify-between">
@@ -318,31 +253,59 @@ export function RoundPayoutTab({ round, scheme }: { round: Round; scheme: Scheme
           </div>
           <p className="text-muted-foreground mt-2 flex gap-2 text-xs">
             <InfoIcon className="mt-0.5 size-3.5 shrink-0" />
-            Keep these close together. Overriding amounts can make the scheme pay out more than it
-            collects.
+            Multiple winners split this month’s Get Amount. The scheme total should still stay close
+            to what is collected.
           </p>
         </Card>
       </div>
 
       <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        open={Boolean(payTarget)}
+        onOpenChange={(open) => {
+          if (!open) setPayTarget(null)
+        }}
         title="Confirm this payout"
         description={
           <span>
             Paying{' '}
             <strong>
-              {roster.find((r) => r.personId === personId)?.person.fullName ?? 'this member'}
+              {roster.find((row) => row.personId === payTarget?.personId)?.person.fullName ??
+                'this member'}
             </strong>{' '}
-            for {formatShortMonth(round.dueDate)}. This marks the round as payout complete.
+            for {formatShortMonth(round.dueDate)}.
           </span>
         }
         confirmLabel="Mark paid"
-        onConfirm={() => save(true)}
+        onConfirm={markPaid}
       >
-        <div className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
-          <span className="text-sm">Amount</span>
-          <MoneyText amount={effectiveAmount} className="text-lg font-bold" />
+        <div className="grid gap-3">
+          <div className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
+            <span className="text-sm">Amount</span>
+            <MoneyText amount={payTarget?.payoutAmount ?? 0} className="text-lg font-bold" />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="winner-method">Method</Label>
+            <Select value={method} onValueChange={(value) => setMethod(value as PaymentMethod)}>
+              <SelectTrigger id="winner-method" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="upi">UPI</SelectItem>
+                <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="winner-paid-date">Date paid</Label>
+            <Input
+              id="winner-paid-date"
+              type="date"
+              value={paidDate}
+              onChange={(event) => setPaidDate(event.target.value)}
+            />
+          </div>
         </div>
       </ConfirmDialog>
     </div>

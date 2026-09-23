@@ -21,15 +21,27 @@ export type SavePayoutInput = {
   markPaid: boolean
 }
 
+function splitPaise(total: Paise, parts: number): Paise[] {
+  if (parts < 1) return []
+  const base = Math.floor(total / parts)
+  const remainder = total - base * parts
+  return Array.from({ length: parts }, (_, index) => base + (index === parts - 1 ? remainder : 0))
+}
+
 export const payoutsRepository = {
-  async getForRound(roundId: string): Promise<Payout | undefined> {
+  async listForRound(roundId: string): Promise<Payout[]> {
     const { data, error } = await getSupabase()
       .from('payouts')
       .select('*')
       .eq('round_id', roundId)
-      .maybeSingle()
+      .order('created_at')
     throwIfError(error)
-    return data ? mapPayout(data) : undefined
+    return (data ?? []).map(mapPayout)
+  },
+
+  async getForRound(roundId: string): Promise<Payout | undefined> {
+    const rows = await payoutsRepository.listForRound(roundId)
+    return rows[0]
   },
 
   async listForScheme(schemeId: string): Promise<Payout[]> {
@@ -90,7 +102,14 @@ export const payoutsRepository = {
       throw new RepositoryError('That membership is inactive.')
     }
 
-    const existing = await payoutsRepository.getForRound(input.roundId)
+    const { data: existingRow, error: existingError } = await getSupabase()
+      .from('payouts')
+      .select('*')
+      .eq('round_id', input.roundId)
+      .eq('person_id', input.personId)
+      .maybeSingle()
+    throwIfError(existingError)
+    const existing = existingRow ? mapPayout(existingRow) : undefined
     const timestamp = nowIso()
     const grossPool = round.expectedCollection
 
@@ -116,26 +135,7 @@ export const payoutsRepository = {
       ? await getSupabase().from('payouts').update(payoutToRow(payout)).eq('id', payout.id)
       : await getSupabase().from('payouts').insert(payoutToRow(payout))
     throwIfError(error)
-
-    const nextStatus =
-      payout.status === 'paid'
-        ? 'payout_complete'
-        : round.status === 'collection_complete'
-          ? 'payout_pending'
-          : round.status
-
-    const { error: roundUpdateError } = await getSupabase()
-      .from('rounds')
-      .update(
-        roundToRow({
-          ...round,
-          recipientPersonId: input.personId,
-          status: nextStatus,
-          updatedAt: timestamp,
-        }),
-      )
-      .eq('id', round.id)
-    throwIfError(roundUpdateError)
+    await refreshRoundWinners(round.id)
 
     const { data: person } = await getSupabase()
       .from('people')
@@ -152,6 +152,101 @@ export const payoutsRepository = {
     })
     notifyDataChanged()
     return payout
+  },
+
+  /** Replace this month’s pending winners. Paid winners are always kept. */
+  async saveWinners(roundId: string, personIds: string[]): Promise<Payout[]> {
+    const uniqueIds = [...new Set(personIds.filter(Boolean))]
+    if (uniqueIds.length === 0) {
+      throw new RepositoryError('Choose at least one member for this month.')
+    }
+
+    const { data: roundRow, error: roundError } = await getSupabase()
+      .from('rounds')
+      .select('*')
+      .eq('id', roundId)
+      .maybeSingle()
+    throwIfError(roundError)
+    if (!roundRow) throw new RepositoryError('Round not found')
+    const round = mapRound(roundRow)
+    if (round.status === 'closed') throw new RepositoryError('This round is closed.')
+
+    const { data: memberRows, error: memberError } = await getSupabase()
+      .from('scheme_members')
+      .select('*')
+      .eq('scheme_id', round.schemeId)
+      .in('person_id', uniqueIds)
+    throwIfError(memberError)
+    const activeIds = new Set(
+      (memberRows ?? [])
+        .map(mapMembership)
+        .filter((row) => row.status === 'active')
+        .map((row) => row.personId),
+    )
+    const missing = uniqueIds.filter((id) => !activeIds.has(id))
+    if (missing.length > 0) {
+      throw new RepositoryError('Only active members of this scheme can be payout winners.')
+    }
+
+    const existing = await payoutsRepository.listForRound(roundId)
+    const paidIds = existing.filter((row) => row.status === 'paid').map((row) => row.personId)
+    for (const id of paidIds) {
+      if (!uniqueIds.includes(id)) uniqueIds.push(id)
+    }
+
+    const pendingToRemove = existing.filter(
+      (row) => row.status !== 'paid' && !uniqueIds.includes(row.personId),
+    )
+    for (const row of pendingToRemove) {
+      const { error } = await getSupabase().from('payouts').delete().eq('id', row.id)
+      throwIfError(error)
+    }
+
+    const shares = splitPaise(round.plannedPayoutAmount, uniqueIds.length)
+    const timestamp = nowIso()
+    const saved: Payout[] = []
+
+    for (let index = 0; index < uniqueIds.length; index += 1) {
+      const personId = uniqueIds[index]
+      const amount = shares[index]
+      const current = existing.find((row) => row.personId === personId)
+      if (current?.status === 'paid') {
+        saved.push(current)
+        continue
+      }
+      const payout = payoutSchema.parse({
+        id: current?.id ?? newId(),
+        schemeId: round.schemeId,
+        roundId,
+        personId,
+        grossPool: round.expectedCollection,
+        adjustment: amount - round.expectedCollection,
+        payoutAmount: amount,
+        autoCalculated: true,
+        paidDate: undefined,
+        method: undefined,
+        reference: current?.reference,
+        status: 'pending',
+        notes: current?.notes,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+      } satisfies Payout)
+      const { error } = current
+        ? await getSupabase().from('payouts').update(payoutToRow(payout)).eq('id', payout.id)
+        : await getSupabase().from('payouts').insert(payoutToRow(payout))
+      throwIfError(error)
+      saved.push(payout)
+    }
+
+    await refreshRoundWinners(roundId)
+    await auditService.record({
+      action: 'payout.recorded',
+      entityType: 'payout',
+      entityId: roundId,
+      summary: `Month ${round.monthNumber} winners saved (${uniqueIds.length})`,
+    })
+    notifyDataChanged()
+    return saved
   },
 
   async markHandover(
@@ -187,22 +282,12 @@ export const payoutsRepository = {
     const round = roundRow ? mapRound(roundRow) : undefined
     if (round?.status === 'closed') throw new RepositoryError('This round is closed.')
 
+    if (payout.status === 'paid') {
+      throw new RepositoryError('A paid winner cannot be removed.')
+    }
     const { error: delError } = await getSupabase().from('payouts').delete().eq('id', payoutId)
     throwIfError(delError)
-    if (round) {
-      const { error: roundError } = await getSupabase()
-        .from('rounds')
-        .update(
-          roundToRow({
-            ...round,
-            recipientPersonId: undefined,
-            status: round.status === 'payout_complete' ? 'collection_complete' : round.status,
-            updatedAt: nowIso(),
-          }),
-        )
-        .eq('id', round.id)
-      throwIfError(roundError)
-    }
+    if (round) await refreshRoundWinners(round.id)
     await auditService.record({
       action: 'payout.removed',
       entityType: 'payout',
@@ -212,4 +297,36 @@ export const payoutsRepository = {
     })
     notifyDataChanged()
   },
+}
+
+async function refreshRoundWinners(roundId: string): Promise<void> {
+  const { data: roundRow, error: roundError } = await getSupabase()
+    .from('rounds')
+    .select('*')
+    .eq('id', roundId)
+    .maybeSingle()
+  throwIfError(roundError)
+  if (!roundRow) return
+  const round = mapRound(roundRow)
+  const winners = await payoutsRepository.listForRound(roundId)
+  const allPaid = winners.length > 0 && winners.every((row) => row.status === 'paid')
+  let status = round.status
+  if (round.status !== 'closed' && round.status !== 'upcoming' && round.status !== 'collection_open') {
+    status = allPaid ? 'payout_complete' : winners.length > 0 ? 'payout_pending' : round.status === 'payout_complete' || round.status === 'payout_pending' ? 'collection_complete' : round.status
+  } else if (winners.length > 0 && (round.status === 'collection_complete' || round.status === 'payout_pending')) {
+    status = allPaid ? 'payout_complete' : 'payout_pending'
+  }
+
+  const { error } = await getSupabase()
+    .from('rounds')
+    .update(
+      roundToRow({
+        ...round,
+        recipientPersonId: winners[0]?.personId,
+        status,
+        updatedAt: nowIso(),
+      }),
+    )
+    .eq('id', roundId)
+  throwIfError(error)
 }
