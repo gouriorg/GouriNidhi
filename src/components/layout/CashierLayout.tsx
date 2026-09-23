@@ -6,14 +6,20 @@ import { SiteFooter } from '@/components/layout/SiteFooter'
 import { OfflineBadge } from '@/components/OfflineBadge'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
+import { membershipsRepository } from '@/repositories/membershipsRepository'
+import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { isCashierSession, useSession, useSessionStore } from '@/stores/session'
 import { cn } from '@/lib/utils'
 
-/** Members get one page. Cashiers who are also members keep Collect in the header. */
-export function MemberLayout() {
+export function CashierLayout() {
   const session = useSession()
   const signOut = useSessionStore((s) => s.signOut)
-  const cashier = isCashierSession(session)
+  const personId = session?.kind === 'member' ? session.personId : undefined
+  const memberships = useLiveQuery(
+    () => (personId ? membershipsRepository.listForPerson(personId) : Promise.resolve([])),
+    [personId],
+  )
+  const showMyAccount = (memberships?.length ?? 0) > 0
 
   return (
     <div className="bg-background min-h-dvh">
@@ -28,35 +34,47 @@ export function MemberLayout() {
             </Button>
           </div>
         </div>
-        {cashier && (
+        {isCashierSession(session) && (
           <nav aria-label="Cashier" className="mx-auto flex h-11 max-w-3xl items-center gap-4 px-4">
             <NavLink
               to="/collect"
+              end
               className={({ isActive }) =>
-                cn('flex items-center gap-1.5 text-sm font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')
+                cn(
+                  'flex items-center gap-1.5 text-sm font-medium',
+                  isActive ? 'text-foreground' : 'text-muted-foreground',
+                )
               }
             >
               <WalletIcon className="size-4" />
-              Collect
+              Members
             </NavLink>
             <NavLink
               to="/collect/payouts"
               className={({ isActive }) =>
-                cn('flex items-center gap-1.5 text-sm font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')
+                cn(
+                  'flex items-center gap-1.5 text-sm font-medium',
+                  isActive ? 'text-foreground' : 'text-muted-foreground',
+                )
               }
             >
               <BanknoteIcon className="size-4" />
               Handover
             </NavLink>
-            <NavLink
-              to="/me"
-              className={({ isActive }) =>
-                cn('flex items-center gap-1.5 text-sm font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')
-              }
-            >
-              <UserIcon className="size-4" />
-              My account
-            </NavLink>
+            {showMyAccount && (
+              <NavLink
+                to="/me"
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-1.5 text-sm font-medium',
+                    isActive ? 'text-foreground' : 'text-muted-foreground',
+                  )
+                }
+              >
+                <UserIcon className="size-4" />
+                My account
+              </NavLink>
+            )}
           </nav>
         )}
       </header>

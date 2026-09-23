@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 
-import { useSession } from '@/stores/session'
+import { homePath, isCashierSession, useSession } from '@/stores/session'
 
 /** Unauthenticated visitors go to the login screen. */
 export function RequireSession() {
@@ -15,14 +15,24 @@ export function RequireSession() {
 }
 
 /**
- * Admin-only area. A member session can never reach Members, Schemes, Reports,
- * Roles, Audit, Backup — it is sent back to its own home.
+ * Admin-only area. Members and cashiers are sent to their own home.
  */
 export function RequireAdmin() {
   const session = useSession()
 
   if (session?.kind !== 'admin') {
-    return <Navigate to="/me" replace />
+    return <Navigate to={homePath(session)} replace />
+  }
+
+  return <Outlet />
+}
+
+/** Cashier Collect workspace. */
+export function RequireCashier() {
+  const session = useSession()
+
+  if (!isCashierSession(session)) {
+    return <Navigate to={homePath(session)} replace />
   }
 
   return <Outlet />

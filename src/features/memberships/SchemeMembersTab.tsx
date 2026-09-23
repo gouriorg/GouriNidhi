@@ -21,6 +21,14 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import { membershipsRepository } from '@/repositories/membershipsRepository'
+import { cashiersRepository } from '@/repositories/cashiersRepository'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toReadableError } from '@/repositories/errors'
 import type { Scheme } from '@/types/entities'
 
@@ -33,10 +41,40 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
     () => membershipsRepository.listForSchemeWithPeople(scheme.id),
     [scheme.id],
   )
+  const cashiers = useLiveQuery(() => cashiersRepository.list(), []) ?? []
+  const [bulkCashierId, setBulkCashierId] = useState<string>('')
 
   const activeCount = rows?.filter((row) => row.status === 'active').length ?? 0
+  const unassignedCount = rows?.filter((row) => row.status === 'active' && !row.collectorPersonId).length ?? 0
+  const cashierCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const row of rows ?? []) {
+      if (row.status !== 'active' || !row.collectorPersonId) continue
+      map.set(row.collectorPersonId, (map.get(row.collectorPersonId) ?? 0) + 1)
+    }
+    return map
+  }, [rows])
   const rosterFull = activeCount >= scheme.maxMembers
   const editable = scheme.status === 'draft' || scheme.status === 'active'
+
+  async function assignCashier(membershipId: string, cashierId: string) {
+    try {
+      await membershipsRepository.setCollector(membershipId, cashierId === 'none' ? null : cashierId)
+      toast.success('Cashier updated')
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not assign this cashier.'))
+    }
+  }
+
+  async function bulkAssign() {
+    if (!bulkCashierId) return
+    try {
+      const count = await membershipsRepository.assignUnassigned(scheme.id, bulkCashierId)
+      toast.success(count === 0 ? 'Everyone already has a cashier' : `Assigned ${count} member(s)`)
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not assign cashiers.'))
+    }
+  }
 
   async function toggleStatus(id: string, currentlyActive: boolean) {
     try {
@@ -65,13 +103,43 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
           <span className="text-foreground tabular font-semibold">
             {activeCount}/{scheme.maxMembers}
           </span>{' '}
-          active members{rosterFull ? ' — the roster is full' : ''}
+          active members
+          {rosterFull ? ' — the roster is full' : ''}
         </p>
-        {editable && (
-          <Button onClick={() => setAddOpen(true)} disabled={rosterFull}>
-            <PlusIcon /> Add member
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          {cashiers.map((cashier) => (
+            <Badge key={cashier.id} variant="muted">
+              {cashier.fullName} {cashierCounts.get(cashier.id) ?? 0}
+            </Badge>
+          ))}
+          <Badge variant="muted">Unassigned {unassignedCount}</Badge>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {editable && cashiers.length > 0 && unassignedCount > 0 && (
+            <>
+              <Select value={bulkCashierId} onValueChange={setBulkCashierId}>
+                <SelectTrigger className="w-48" size="sm">
+                  <SelectValue placeholder="Assign unassigned…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashiers.map((cashier) => (
+                    <SelectItem key={cashier.id} value={cashier.id}>
+                      {cashier.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" disabled={!bulkCashierId} onClick={() => void bulkAssign()}>
+                Assign unassigned
+              </Button>
+            </>
+          )}
+          {editable && (
+            <Button onClick={() => setAddOpen(true)} disabled={rosterFull}>
+              <PlusIcon /> Add member
+            </Button>
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -96,6 +164,7 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
                   <TableHead className="w-16">#</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Mobile</TableHead>
+                  <TableHead>Cashier</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -115,6 +184,28 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
                       </Link>
                     </TableCell>
                     <TableCell className="tabular">{row.person.mobile}</TableCell>
+                    <TableCell>
+                      {editable && cashiers.length > 0 ? (
+                        <Select
+                          value={row.collectorPersonId ?? 'none'}
+                          onValueChange={(value) => void assignCashier(row.id, value)}
+                        >
+                          <SelectTrigger size="sm" className="w-40">
+                            <SelectValue placeholder="Unassigned" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Unassigned</SelectItem>
+                            {cashiers.map((cashier) => (
+                              <SelectItem key={cashier.id} value={cashier.id}>
+                                {cashier.fullName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        cashiers.find((cashier) => cashier.id === row.collectorPersonId)?.fullName ?? '—'
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={row.status === 'active' ? 'success' : 'muted'}>
                         {row.status === 'active' ? 'Active' : 'Inactive'}
@@ -162,6 +253,26 @@ export function SchemeMembersTab({ scheme }: { scheme: Scheme }) {
                       {row.person.fullName}
                     </p>
                     <p className="text-muted-foreground tabular text-sm">{row.person.mobile}</p>
+                    {editable && cashiers.length > 0 && (
+                      <div className="mt-2">
+                        <Select
+                          value={row.collectorPersonId ?? 'none'}
+                          onValueChange={(value) => void assignCashier(row.id, value)}
+                        >
+                          <SelectTrigger size="sm" className="w-full">
+                            <SelectValue placeholder="Cashier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Unassigned</SelectItem>
+                            {cashiers.map((cashier) => (
+                              <SelectItem key={cashier.id} value={cashier.id}>
+                                {cashier.fullName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>
                     {row.status === 'active' ? 'Active' : 'Inactive'}

@@ -4,6 +4,7 @@ import {
   BanknoteIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
+  PhoneIcon,
   PlusIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -27,8 +28,9 @@ import { PageHeader } from '@/components/PageHeader'
 import { StatCard } from '@/components/StatCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { features } from '@/config/features'
 import { loadAdminDashboard } from '@/features/dashboard/admin/adminDashboardService'
-import { formatDisplayDate, formatDisplayDateTime } from '@/lib/dates'
+import { formatDisplayDate, formatDisplayDateTime, formatShortMonth } from '@/lib/dates'
 
 export function AdminDashboardPage() {
   const data = useLiveQuery(() => loadAdminDashboard(), [])
@@ -120,6 +122,93 @@ export function AdminDashboardPage() {
             />
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <StatCard
+              label="Cashiers"
+              value={data.cashierCount}
+              hint="People with the cashier role"
+              icon={UsersIcon}
+            />
+            <StatCard
+              label="Unassigned members"
+              value={data.unassignedMembers}
+              hint="Active scheme seats without a cashier"
+              tone={data.unassignedMembers > 0 ? 'warning' : 'success'}
+              icon={AlertTriangleIcon}
+            />
+          </div>
+
+          {data.callAlerts.length > 0 && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PhoneIcon className="size-5" />
+                  Call overdue members
+                </CardTitle>
+                <CardDescription>
+                  These members missed the monthly due day. Call them, or ask their cashier to collect.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-border divide-y">
+                  {data.callAlerts.map((alert) => (
+                    <li key={alert.paymentId} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                      <div>
+                        <p className="text-sm font-medium">{alert.personName}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {alert.schemeCode} · {formatShortMonth(alert.dueDate)} · due {formatDisplayDate(alert.dueDate)}
+                          {alert.cashierName ? ` · cashier ${alert.cashierName}` : ' · no cashier'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <a href={`tel:${alert.mobile}`} className="text-primary tabular text-sm font-medium hover:underline">
+                          {alert.mobile}
+                        </a>
+                        <p className="text-muted-foreground text-xs">
+                          <MoneyText amount={alert.pending} /> pending
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>By cashier</CardTitle>
+              <CardDescription>
+                Assigned members and this month’s open collection.{' '}
+                <Link to="/cashiers" className="text-primary hover:underline">
+                  Manage cashiers
+                </Link>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.byCashier.length === 0 ? (
+                <p className="text-muted-foreground py-6 text-center text-sm">No cashiers yet.</p>
+              ) : (
+                <ul className="divide-border divide-y">
+                  {data.byCashier.map((row) => (
+                    <li key={row.personId} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                      <div>
+                        <p className="text-sm font-medium">{row.name}</p>
+                        <p className="text-muted-foreground text-xs">{row.assignedCount} assigned</p>
+                      </div>
+                      <div className="text-right text-sm">
+                        <MoneyText amount={row.collectedOpen} className="font-semibold" />
+                        <p className="text-muted-foreground text-xs">
+                          <MoneyText amount={row.pendingOpen} /> still to collect
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
@@ -208,7 +297,7 @@ export function AdminDashboardPage() {
                             to={`/schemes/${due.schemeId}/rounds/${due.roundId}`}
                             className="hover:text-primary text-sm font-medium hover:underline"
                           >
-                            {due.schemeCode} · Month {due.monthNumber}
+                            {due.schemeCode} · {formatShortMonth(due.dueDate)}
                           </Link>
                           <p className="text-muted-foreground text-xs">
                             Due {formatDisplayDate(due.dueDate)}
@@ -231,28 +320,30 @@ export function AdminDashboardPage() {
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent activity</CardTitle>
-              <CardDescription>The latest changes recorded in the audit log.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {data.recentActivity.length === 0 ? (
-                <p className="text-muted-foreground py-6 text-center text-sm">Nothing yet.</p>
-              ) : (
-                <ul className="divide-border divide-y">
-                  {data.recentActivity.map((entry) => (
-                    <li key={entry.id} className="flex items-baseline justify-between gap-4 py-2.5">
-                      <span className="text-sm">{entry.summary}</span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {formatDisplayDateTime(entry.createdAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          {features.auditLog && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent activity</CardTitle>
+                <CardDescription>The latest changes recorded in the audit log.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {data.recentActivity.length === 0 ? (
+                  <p className="text-muted-foreground py-6 text-center text-sm">Nothing yet.</p>
+                ) : (
+                  <ul className="divide-border divide-y">
+                    {data.recentActivity.map((entry) => (
+                      <li key={entry.id} className="flex items-baseline justify-between gap-4 py-2.5">
+                        <span className="text-sm">{entry.summary}</span>
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          {formatDisplayDateTime(entry.createdAt)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </>

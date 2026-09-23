@@ -31,6 +31,7 @@ import {
   settingToRow,
   throwIfError,
 } from '@/lib/mappers'
+import { features } from '@/config/features'
 import { getSupabase } from '@/lib/supabase'
 import { auditService } from '@/services/audit'
 import { notifyDataChanged } from '@/stores/dataVersion'
@@ -74,7 +75,7 @@ export async function countAllRows(): Promise<TableCounts> {
       countTable('rounds'),
       countTable('payments'),
       countTable('payouts'),
-      countTable('audit_logs'),
+      features.auditLog ? countTable('audit_logs') : Promise.resolve(0),
       countTable('settings'),
     ])
   return { people, schemes, schemeMembers, rounds, payments, payouts, auditLogs, settings }
@@ -97,7 +98,9 @@ async function upsertRows(table: string, rows: Record<string, unknown>[]): Promi
 
 async function wipeLiveData(): Promise<void> {
   const supabase = getSupabase()
-  const dated = ['payments', 'payouts', 'rounds', 'scheme_members', 'schemes', 'audit_logs', 'people']
+  const dated = features.auditLog
+    ? ['payments', 'payouts', 'rounds', 'scheme_members', 'schemes', 'audit_logs', 'people']
+    : ['payments', 'payouts', 'rounds', 'scheme_members', 'schemes', 'people']
   for (const table of dated) {
     const { error } = await supabase.from(table).delete().gte('created_at', '1900-01-01')
     throwIfError(error)
@@ -114,7 +117,9 @@ async function writeTables(envelope: BackupEnvelope): Promise<void> {
   await upsertRows('rounds', tables.rounds.map(roundToRow))
   await upsertRows('payments', tables.payments.map(paymentToRow))
   await upsertRows('payouts', tables.payouts.map(payoutToRow))
-  await upsertRows('audit_logs', tables.auditLogs.map(auditToRow))
+  if (features.auditLog) {
+    await upsertRows('audit_logs', tables.auditLogs.map(auditToRow))
+  }
   await upsertRows('settings', tables.settings.map(settingToRow))
 
   for (const person of tables.people) {
@@ -135,7 +140,7 @@ export const backupService = {
         fetchMapped('rounds', mapRound),
         fetchMapped('payments', mapPayment),
         fetchMapped('payouts', mapPayout),
-        fetchMapped('audit_logs', mapAudit),
+        features.auditLog ? fetchMapped('audit_logs', mapAudit) : Promise.resolve([]),
         fetchMapped('settings', mapSetting),
       ])
 

@@ -4,12 +4,12 @@ import { BrandLockup } from '@/components/brand/Logo'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
-import { useSession } from '@/stores/session'
+import { homePath, useSession } from '@/stores/session'
 
 /** Public pages (contact, organizers, terms) — available without signing in. */
 export function PublicLayout() {
   const session = useSession()
-  const home = session?.kind === 'member' ? '/me' : session?.kind === 'admin' ? '/' : '/login'
+  const home = homePath(session)
 
   return (
     <div className="bg-background flex min-h-dvh flex-col">

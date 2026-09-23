@@ -133,6 +133,15 @@ export const roundsRepository = {
     return { obligationsCreated: newPayments.length }
   },
 
+  /** Opens current and past months on active schemes. Future months stay manual. */
+  async openDueCollections(): Promise<number> {
+    const { data, error } = await getSupabase().rpc('open_due_collections')
+    if (error) throw new RepositoryError(error.message || 'Could not open due collections.')
+    const opened = typeof data === 'number' ? data : Number(data ?? 0)
+    if (opened > 0) notifyDataChanged()
+    return opened
+  },
+
   async setStatus(roundId: string, status: RoundStatus): Promise<void> {
     const round = await getRound(roundId)
     if (!round) throw new RepositoryError('Round not found')

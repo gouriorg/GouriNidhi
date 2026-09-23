@@ -9,7 +9,9 @@ import {
   mapScheme,
   throwIfError,
 } from '@/lib/mappers'
+import { features } from '@/config/features'
 import { getSupabase } from '@/lib/supabase'
+import { roundsRepository } from '@/repositories/roundsRepository'
 import type { Paise } from '@/domain/money/money'
 
 export type AdminDashboard = {
@@ -38,6 +40,26 @@ export type AdminDashboard = {
   }[]
   collectionByScheme: { code: string; collected: number; pending: number }[]
   recentActivity: { id: string; summary: string; createdAt: string; actorLabel: string }[]
+  cashierCount: number
+  unassignedMembers: number
+  byCashier: {
+    personId: string
+    name: string
+    assignedCount: number
+    dueOpen: Paise
+    collectedOpen: Paise
+    pendingOpen: Paise
+  }[]
+  callAlerts: {
+    paymentId: string
+    personName: string
+    mobile: string
+    schemeCode: string
+    monthNumber: number
+    dueDate: string
+    pending: Paise
+    cashierName: string | null
+  }[]
 }
 
 async function all<T>(table: string, map: (row: Record<string, unknown>) => T): Promise<T[]> {
@@ -48,23 +70,31 @@ async function all<T>(table: string, map: (row: Record<string, unknown>) => T): 
 
 /** Aggregates every scheme. Admin-only by construction. */
 export async function loadAdminDashboard(): Promise<AdminDashboard> {
+  await roundsRepository.openDueCollections()
   const today = todayIso()
 
-  const [people, schemes, memberships, rounds, payments, payouts, logs] = await Promise.all([
+  const [people, schemes, memberships, rounds, payments, payouts, logs, cashierRoles] = await Promise.all([
     all('people', mapPerson),
     all('schemes', mapScheme),
     all('scheme_members', mapMembership),
     all('rounds', mapRound),
     all('payments', mapPayment),
     all('payouts', mapPayout),
+    features.auditLog
+      ? (async () => {
+          const { data, error } = await getSupabase()
+            .from('audit_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(8)
+          throwIfError(error)
+          return (data ?? []).map((row) => mapAudit(row as Record<string, unknown>))
+        })()
+      : Promise.resolve([]),
     (async () => {
-      const { data, error } = await getSupabase()
-        .from('audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(8)
+      const { data, error } = await getSupabase().from('user_roles').select('user_id').eq('role', 'cashier')
       throwIfError(error)
-      return (data ?? []).map((row) => mapAudit(row as Record<string, unknown>))
+      return data ?? []
     })(),
   ])
 
@@ -137,8 +167,77 @@ export async function loadAdminDashboard(): Promise<AdminDashboard> {
     ).length,
     roundsTotal: rounds.length,
     overdueCount,
+    callAlerts: (() => {
+      const peopleById = new Map(people.map((person) => [person.id, person]))
+      return payments
+        .flatMap((payment) => {
+          if (payment.status === 'paid' || payment.status === 'waived') return []
+          const round = roundById.get(payment.roundId)
+          if (!round || round.dueDate >= today) return []
+          const person = peopleById.get(payment.personId)
+          const scheme = schemeById.get(payment.schemeId)
+          const membership = memberships.find(
+            (row) =>
+              row.status === 'active' &&
+              row.schemeId === payment.schemeId &&
+              row.personId === payment.personId,
+          )
+          const cashier = membership?.collectorPersonId
+            ? peopleById.get(membership.collectorPersonId)
+            : undefined
+          return [
+            {
+              paymentId: payment.id,
+              personName: person?.fullName ?? 'Member',
+              mobile: person?.mobile ?? '—',
+              schemeCode: scheme?.code ?? '—',
+              monthNumber: round.monthNumber,
+              dueDate: round.dueDate,
+              pending: payment.amountDue - payment.amountPaid,
+              cashierName: cashier?.fullName ?? null,
+            },
+          ]
+        })
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.personName.localeCompare(b.personName))
+    })(),
     upcomingDues,
     collectionByScheme,
+    cashierCount: cashierRoles.length,
+    unassignedMembers: memberships.filter(
+      (membership) => membership.status === 'active' && !membership.collectorPersonId,
+    ).length,
+    byCashier: (() => {
+      const cashierUserIds = new Set(cashierRoles.map((row) => String(row.user_id)))
+      const cashiers = people.filter((person) => person.authUserId && cashierUserIds.has(person.authUserId))
+      const openRoundIds = new Set(
+        rounds.filter((round) => round.status === 'collection_open').map((round) => round.id),
+      )
+      return cashiers
+        .map((cashier) => {
+          const assigned = memberships.filter(
+            (membership) =>
+              membership.status === 'active' && membership.collectorPersonId === cashier.id,
+          )
+          const assignedPeople = new Set(assigned.map((membership) => `${membership.schemeId}:${membership.personId}`))
+          const openPayments = payments.filter(
+            (payment) =>
+              openRoundIds.has(payment.roundId) &&
+              assignedPeople.has(`${payment.schemeId}:${payment.personId}`) &&
+              payment.status !== 'waived',
+          )
+          const dueOpen = openPayments.reduce((sum, payment) => sum + payment.amountDue, 0)
+          const collectedOpen = openPayments.reduce((sum, payment) => sum + payment.amountPaid, 0)
+          return {
+            personId: cashier.id,
+            name: cashier.fullName,
+            assignedCount: assigned.length,
+            dueOpen,
+            collectedOpen,
+            pendingOpen: dueOpen - collectedOpen,
+          }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name))
+    })(),
     recentActivity: logs.map((log) => ({
       id: log.id,
       summary: log.summary,

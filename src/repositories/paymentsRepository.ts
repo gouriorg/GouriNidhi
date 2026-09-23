@@ -2,14 +2,37 @@ import { todayIso } from '@/lib/dates'
 import { nowIso } from '@/lib/id'
 import { mapPayment, mapPerson, mapRound, paymentToRow, throwIfError } from '@/lib/mappers'
 import { getSupabase } from '@/lib/supabase'
+import { useSessionStore } from '@/stores/session'
 import { auditService } from '@/services/audit'
 import { notifyDataChanged } from '@/stores/dataVersion'
 import { RepositoryError } from '@/repositories/errors'
-import { summarisePayments } from '@/repositories/roundsRepository'
 import type { Paise } from '@/domain/money/money'
 import type { DateOnly, Payment, PaymentMethod, PaymentStatus, Person } from '@/types/entities'
 
 export type PaymentWithPerson = Payment & { person?: Person }
+
+export type PaymentStatusInput = {
+  schemeId: string
+  roundId: string
+  personId: string
+  paid: boolean
+  paidDate?: DateOnly
+}
+
+async function setPaymentStatus(
+  rpc: 'cashier_set_payment' | 'admin_set_payment',
+  input: PaymentStatusInput,
+): Promise<void> {
+  const { error } = await getSupabase().rpc(rpc, {
+    p_scheme_id: input.schemeId,
+    p_round_id: input.roundId,
+    p_person_id: input.personId,
+    p_paid: input.paid,
+    p_paid_date: input.paid ? (input.paidDate ?? todayIso()) : null,
+  })
+  if (error) throw new RepositoryError(error.message || 'Could not update this payment.')
+  notifyDataChanged()
+}
 
 export type RecordPaymentInput = {
   paymentId: string
@@ -53,20 +76,8 @@ async function getRound(id: string) {
 }
 
 async function persistRoundTotals(roundId: string) {
-  const round = await getRound(roundId)
-  if (!round) return
-  const { data, error } = await getSupabase().from('payments').select('*').eq('round_id', roundId)
+  const { error } = await getSupabase().rpc('refresh_round_totals', { p_round_id: roundId })
   throwIfError(error)
-  const totals = summarisePayments((data ?? []).map(mapPayment))
-  const { error: updateError } = await getSupabase()
-    .from('rounds')
-    .update({
-      actual_collection: totals.collected,
-      pending_amount: totals.pending,
-      updated_at: nowIso(),
-    })
-    .eq('id', roundId)
-  throwIfError(updateError)
 }
 
 export const paymentsRepository = {
@@ -131,9 +142,12 @@ export const paymentsRepository = {
       )
     }
 
+    const session = useSessionStore.getState().session
+    const recordedByPersonId = session?.kind === 'member' ? session.personId : undefined
     const status = deriveStatus(before.amountDue, input.amountPaid)
     const updated: Payment = {
       ...before,
+      recordedByPersonId,
       amountPaid: input.amountPaid,
       paidDate: input.amountPaid > 0 ? (input.paidDate ?? todayIso()) : undefined,
       method: input.amountPaid > 0 ? input.method : undefined,
@@ -263,6 +277,14 @@ export const paymentsRepository = {
       after: updated,
     })
     notifyDataChanged()
+  },
+
+  async setCashierStatus(input: PaymentStatusInput): Promise<void> {
+    await setPaymentStatus('cashier_set_payment', input)
+  },
+
+  async setAdminStatus(input: PaymentStatusInput): Promise<void> {
+    await setPaymentStatus('admin_set_payment', input)
   },
 
   /** Undo a waive or a recorded amount, back to Pending. */

@@ -11,13 +11,14 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import { roundsRepository } from '@/repositories/roundsRepository'
-import { formatDisplayDate } from '@/lib/dates'
+import { formatDisplayDate, formatShortMonth, isCurrentOrPastMonth } from '@/lib/dates'
 import { toReadableError } from '@/repositories/errors'
 import { schemesRepository } from '@/repositories/schemesRepository'
 import type { Scheme } from '@/types/entities'
 
 export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
   const rounds = useLiveQuery(async () => {
+    await roundsRepository.openDueCollections()
     const rows = await roundsRepository.listForScheme(scheme.id)
     const ids = rows.map((round) => round.recipientPersonId).filter((id): id is string => Boolean(id))
     const people = await Promise.all(ids.map((id) => peopleRepository.get(id)))
@@ -73,7 +74,7 @@ export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">Month</TableHead>
+              <TableHead className="w-24">Month</TableHead>
               <TableHead>Due date</TableHead>
               <TableHead className="text-right">Expected</TableHead>
               <TableHead className="text-right">Collected</TableHead>
@@ -86,7 +87,7 @@ export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
           <TableBody>
             {rounds.map((round) => (
               <TableRow key={round.id}>
-                <TableCell className="tabular font-medium">{round.monthNumber}</TableCell>
+                <TableCell className="font-medium">{formatShortMonth(round.dueDate)}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDisplayDate(round.dueDate)}
                 </TableCell>
@@ -107,7 +108,7 @@ export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    {round.status === 'upcoming' && (
+                    {round.status === 'upcoming' && !isCurrentOrPastMonth(round.dueDate) && (
                       <Button size="sm" variant="outline" onClick={() => openCollection(round.id)}>
                         Open collection
                       </Button>
@@ -130,7 +131,7 @@ export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
           <Card key={round.id} className="gap-2 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold">Month {round.monthNumber}</p>
+                <p className="font-semibold">{formatShortMonth(round.dueDate)}</p>
                 <p className="text-muted-foreground text-xs">{formatDisplayDate(round.dueDate)}</p>
               </div>
               <RoundStatusBadge status={round.status} />
@@ -149,7 +150,7 @@ export function SchemeRoundsTab({ scheme }: { scheme: Scheme }) {
               <span className="text-right">{round.recipientName ?? 'No recipient'}</span>
             </div>
             <div className="mt-2 flex gap-2">
-              {round.status === 'upcoming' && (
+              {round.status === 'upcoming' && !isCurrentOrPastMonth(round.dueDate) && (
                 <Button
                   size="sm"
                   variant="outline"

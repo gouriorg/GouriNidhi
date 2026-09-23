@@ -1,3 +1,4 @@
+import { features } from '@/config/features'
 import {
   FileTextIcon,
   HistoryIcon,
@@ -6,6 +7,7 @@ import {
   ShieldIcon,
   UsersIcon,
   WalletIcon,
+  BanknoteIcon,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -20,10 +22,11 @@ export type NavItem = {
 export const adminNavItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboardIcon, end: true },
   { to: '/members', label: 'Members', icon: UsersIcon },
+  { to: '/cashiers', label: 'Cashiers', icon: BanknoteIcon },
   { to: '/schemes', label: 'Schemes', icon: WalletIcon },
   { to: '/reports', label: 'Reports', icon: FileTextIcon },
   { to: '/roles', label: 'Roles', icon: ShieldIcon },
-  { to: '/audit', label: 'Audit log', icon: HistoryIcon },
+  ...(features.auditLog ? [{ to: '/audit', label: 'Audit log', icon: HistoryIcon } satisfies NavItem] : []),
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 

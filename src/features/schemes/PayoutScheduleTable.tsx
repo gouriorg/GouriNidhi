@@ -1,7 +1,7 @@
 import { MoneyText } from '@/components/MoneyText'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDisplayDate } from '@/lib/dates'
+import { formatDisplayDate, formatShortMonth } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import type { ScheduleLine } from '@/types/entities'
 
@@ -46,7 +46,7 @@ export function PayoutScheduleTable({
                   className={cn(highlighted && 'bg-primary/8 hover:bg-primary/12')}
                 >
                   <TableCell className="font-medium">
-                    {line.monthNumber}
+                    {formatShortMonth(line.dueDate)}
                     {highlighted && (
                       <span className="text-primary ml-2 text-xs font-semibold">Your month</span>
                     )}
@@ -94,7 +94,7 @@ export function PayoutScheduleTable({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-sm font-semibold">
-                  Month {line.monthNumber}
+                  {formatShortMonth(line.dueDate)}
                   {highlighted && <span className="text-primary ml-2 text-xs">Your month</span>}
                 </span>
                 <span className="text-muted-foreground text-xs">

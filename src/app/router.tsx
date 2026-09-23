@@ -3,12 +3,14 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 
 import { LoadingState } from '@/components/EmptyState'
 import { AdminLayout } from '@/components/layout/AdminLayout'
+import { CashierLayout } from '@/components/layout/CashierLayout'
 import { MemberLayout } from '@/components/layout/MemberLayout'
 import { PublicLayout } from '@/components/layout/PublicLayout'
-import { RequireAdmin, RequireSession } from '@/app/guards'
+import { RequireAdmin, RequireCashier, RequireSession } from '@/app/guards'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
 import { RouteErrorBoundary } from '@/features/misc/RouteErrorBoundary'
+import { features } from '@/config/features'
 
 /*
  * Pages are code-split so a member on a phone downloads their one screen
@@ -55,6 +57,19 @@ const AuditPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const CashiersPage = lazy(() =>
+  import('@/features/cashiers/CashiersPage').then((m) => ({ default: m.CashiersPage })),
+)
+const CashierCollectPage = lazy(() =>
+  import('@/features/dashboard/cashier/CashierCollectPage').then((m) => ({
+    default: m.CashierCollectPage,
+  })),
+)
+const CashierPayoutsPage = lazy(() =>
+  import('@/features/dashboard/cashier/CashierPayoutsPage').then((m) => ({
+    default: m.CashierPayoutsPage,
+  })),
+)
 const ContactPage = lazy(() =>
   import('@/features/site/ContactPage').then((m) => ({ default: m.ContactPage })),
 )
@@ -94,6 +109,18 @@ const router = createBrowserRouter([
         element: <MemberLayout />,
         children: [{ path: '/me', element: page(<MemberHomePage />) }],
       },
+      {
+        element: <RequireCashier />,
+        children: [
+          {
+            element: <CashierLayout />,
+            children: [
+              { path: '/collect', element: page(<CashierCollectPage />) },
+              { path: '/collect/payouts', element: page(<CashierPayoutsPage />) },
+            ],
+          },
+        ],
+      },
       // Admin workspace.
       {
         element: <RequireAdmin />,
@@ -103,6 +130,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: page(<AdminDashboardPage />) },
               { path: 'members', element: page(<MembersPage />) },
+              { path: 'cashiers', element: page(<CashiersPage />) },
               { path: 'members/:personId', element: page(<MemberDetailPage />) },
               { path: 'schemes', element: page(<SchemesPage />) },
               { path: 'schemes/new', element: page(<SchemeFormPage />) },
@@ -111,7 +139,7 @@ const router = createBrowserRouter([
               { path: 'schemes/:schemeId/rounds/:roundId', element: page(<RoundDetailPage />) },
               { path: 'reports', element: page(<ReportsPage />) },
               { path: 'roles', element: page(<RolesPage />) },
-              { path: 'audit', element: page(<AuditPage />) },
+              ...(features.auditLog ? [{ path: 'audit', element: page(<AuditPage />) }] : []),
               { path: 'settings', element: page(<SettingsPage />) },
             ],
           },

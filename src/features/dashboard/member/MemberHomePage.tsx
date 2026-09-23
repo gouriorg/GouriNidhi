@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PayoutScheduleChart } from '@/features/schemes/PayoutScheduleChart'
 import { loadMemberHome } from '@/features/dashboard/member/memberHomeService'
 import { OrganizerAvatar } from '@/components/OrganizerAvatar'
-import { formatDisplayDate } from '@/lib/dates'
+import { formatDisplayDate, formatShortMonth } from '@/lib/dates'
 import { organizersRepository } from '@/repositories/organizersRepository'
 import { siteContentRepository } from '@/repositories/siteContentRepository'
 import { useSession } from '@/stores/session'
@@ -125,7 +125,12 @@ export function MemberHomePage() {
                   <div className="bg-muted/50 rounded-lg p-3">
                     <p className="text-muted-foreground text-xs">Your payout month</p>
                     <p className="tabular mt-1 text-base font-bold">
-                      {scheme.myMonth ? `Month ${scheme.myMonth}` : 'Not assigned yet'}
+                      {scheme.myMonth
+                        ? formatShortMonth(
+                            scheme.schedule.find((line) => line.monthNumber === scheme.myMonth)
+                              ?.dueDate,
+                          )
+                        : 'Not assigned yet'}
                     </p>
                   </div>
                 </div>
@@ -155,7 +160,7 @@ export function MemberHomePage() {
                 <li key={due.id} className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <p className="text-sm font-medium">
-                      {due.schemeCode} · Month {due.monthNumber}
+                      {due.schemeCode} · {formatShortMonth(due.dueDate)}
                     </p>
                     <p className="text-muted-foreground text-xs">
                       Due {formatDisplayDate(due.dueDate)}
@@ -190,7 +195,7 @@ export function MemberHomePage() {
                 <li key={payment.id} className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <p className="text-sm font-medium">
-                      {payment.schemeCode} · Month {payment.monthNumber}
+                      {payment.schemeCode} · {formatShortMonth(payment.dueDate)}
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {payment.paidDate
@@ -231,7 +236,7 @@ export function MemberHomePage() {
                 <li key={payout.id} className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <p className="text-sm font-medium">
-                      {payout.schemeCode} · Month {payout.monthNumber}
+                      {payout.schemeCode} · {formatShortMonth(payout.dueDate)}
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {payout.paidDate

@@ -154,6 +154,21 @@ export const payoutsRepository = {
     return payout
   },
 
+  async markHandover(
+    payoutId: string,
+    input: { paidDate?: DateOnly; method?: PaymentMethod; reference?: string; notes?: string } = {},
+  ): Promise<void> {
+    const { error } = await getSupabase().rpc('cashier_mark_payout_paid', {
+      p_payout_id: payoutId,
+      p_paid_date: input.paidDate ?? todayIso(),
+      p_method: input.method ?? 'cash',
+      p_reference: input.reference ?? '',
+      p_notes: input.notes ?? '',
+    })
+    throwIfError(error)
+    notifyDataChanged()
+  },
+
   async remove(payoutId: string): Promise<void> {
     const { data, error } = await getSupabase()
       .from('payouts')

@@ -69,6 +69,7 @@ export const schemeMemberSchema = z.object({
   memberNumber: z.number().int().positive(),
   status: z.enum(['active', 'inactive']),
   joinedAt: dateOnlySchema,
+  collectorPersonId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 })
@@ -108,6 +109,7 @@ export const paymentSchema = z.object({
   reference: z.string().trim().max(80).optional(),
   status: z.enum(['pending', 'partially_paid', 'paid', 'waived']),
   notes: z.string().trim().max(500).optional(),
+  recordedByPersonId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 })
@@ -126,6 +128,7 @@ export const payoutSchema = z.object({
   reference: z.string().trim().max(80).optional(),
   status: z.enum(['pending', 'paid']),
   notes: z.string().trim().max(500).optional(),
+  recordedByPersonId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 })

@@ -1,5 +1,5 @@
 import { formatRupeesPlain } from '@/domain/money/money'
-import { todayIso } from '@/lib/dates'
+import { formatShortMonth, todayIso } from '@/lib/dates'
 import { paymentMethodLabels, paymentStatusLabels, payoutStatusLabels } from '@/lib/constants'
 import {
   mapPayment,
@@ -99,7 +99,7 @@ export async function collectionReport(filters: ReportFilters): Promise<ReportRe
         payment.status !== 'paid' && payment.status !== 'waived' && (round?.dueDate ?? '') < today
       return {
         scheme: scheme?.code ?? '—',
-        month: round?.monthNumber ?? 0,
+        month: formatShortMonth(round?.dueDate),
         dueDate: round?.dueDate ?? '',
         member: person?.fullName ?? '—',
         mobile: person?.mobile ?? '',
@@ -115,7 +115,7 @@ export async function collectionReport(filters: ReportFilters): Promise<ReportRe
     .sort(
       (a, b) =>
         String(a.scheme).localeCompare(String(b.scheme)) ||
-        Number(a.month) - Number(b.month) ||
+        String(a.dueDate).localeCompare(String(b.dueDate)) ||
         String(a.member).localeCompare(String(b.member)),
     )
 
@@ -127,7 +127,7 @@ export async function collectionReport(filters: ReportFilters): Promise<ReportRe
   return {
     columns: [
       { key: 'scheme', label: 'Scheme' },
-      { key: 'month', label: 'Month', numeric: true },
+      { key: 'month', label: 'Month' },
       { key: 'dueDate', label: 'Due date' },
       { key: 'member', label: 'Member' },
       { key: 'mobile', label: 'Mobile' },
@@ -172,7 +172,7 @@ export async function payoutReport(filters: ReportFilters): Promise<ReportResult
       const person = personById.get(payout.personId)
       return {
         scheme: scheme?.code ?? '—',
-        month: round?.monthNumber ?? 0,
+        month: formatShortMonth(round?.dueDate),
         dueDate: round?.dueDate ?? '',
         member: person?.fullName ?? '—',
         pool: formatRupeesPlain(payout.grossPool),
@@ -186,7 +186,8 @@ export async function payoutReport(filters: ReportFilters): Promise<ReportResult
     })
     .sort(
       (a, b) =>
-        String(a.scheme).localeCompare(String(b.scheme)) || Number(a.month) - Number(b.month),
+        String(a.scheme).localeCompare(String(b.scheme)) ||
+        String(a.dueDate).localeCompare(String(b.dueDate)),
     )
 
   const paid = filtered
@@ -197,7 +198,7 @@ export async function payoutReport(filters: ReportFilters): Promise<ReportResult
   return {
     columns: [
       { key: 'scheme', label: 'Scheme' },
-      { key: 'month', label: 'Month', numeric: true },
+      { key: 'month', label: 'Month' },
       { key: 'dueDate', label: 'Due date' },
       { key: 'member', label: 'Recipient' },
       { key: 'pool', label: 'Pool (₹)', numeric: true },
@@ -242,7 +243,7 @@ export async function schemeStatement(filters: ReportFilters): Promise<ReportRes
         .reduce((sum, p) => sum + (p.amountDue - p.amountPaid), 0)
 
       return {
-        month: round.monthNumber,
+        month: formatShortMonth(round.dueDate),
         dueDate: round.dueDate,
         expected: formatRupeesPlain(round.expectedCollection),
         collected: formatRupeesPlain(collected),
@@ -256,7 +257,7 @@ export async function schemeStatement(filters: ReportFilters): Promise<ReportRes
 
   return {
     columns: [
-      { key: 'month', label: 'Month', numeric: true },
+      { key: 'month', label: 'Month' },
       { key: 'dueDate', label: 'Due date' },
       { key: 'expected', label: 'Expected (₹)', numeric: true },
       { key: 'collected', label: 'Collected (₹)', numeric: true },
@@ -304,7 +305,7 @@ export async function memberStatement(filters: ReportFilters): Promise<ReportRes
       const payout = payouts.find((p) => p.roundId === payment.roundId)
       return {
         scheme: schemeById.get(payment.schemeId)?.code ?? '—',
-        month: round?.monthNumber ?? 0,
+        month: formatShortMonth(round?.dueDate),
         dueDate: round?.dueDate ?? '',
         contributionDue: formatRupeesPlain(payment.amountDue),
         contributionPaid: formatRupeesPlain(payment.amountPaid),
@@ -314,13 +315,14 @@ export async function memberStatement(filters: ReportFilters): Promise<ReportRes
     })
     .sort(
       (a, b) =>
-        String(a.scheme).localeCompare(String(b.scheme)) || Number(a.month) - Number(b.month),
+        String(a.scheme).localeCompare(String(b.scheme)) ||
+        String(a.dueDate).localeCompare(String(b.dueDate)),
     )
 
   return {
     columns: [
       { key: 'scheme', label: 'Scheme' },
-      { key: 'month', label: 'Month', numeric: true },
+      { key: 'month', label: 'Month' },
       { key: 'dueDate', label: 'Due date' },
       { key: 'contributionDue', label: 'Due (₹)', numeric: true },
       { key: 'contributionPaid', label: 'Paid (₹)', numeric: true },

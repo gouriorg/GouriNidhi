@@ -104,6 +104,7 @@ export function mapMembership(row: Row): SchemeMember {
     memberNumber: num(row, 'member_number'),
     status: str(row, 'status') as SchemeMember['status'],
     joinedAt: str(row, 'joined_at'),
+    collectorPersonId: optStr(row, 'collector_person_id'),
     createdAt: str(row, 'created_at'),
     updatedAt: str(row, 'updated_at'),
   }
@@ -117,6 +118,7 @@ export function membershipToRow(row: SchemeMember) {
     member_number: row.memberNumber,
     status: row.status,
     joined_at: row.joinedAt,
+    collector_person_id: row.collectorPersonId ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   }
@@ -171,6 +173,7 @@ export function mapPayment(row: Row): Payment {
     reference: optStr(row, 'reference'),
     status: str(row, 'status') as Payment['status'],
     notes: optStr(row, 'notes'),
+    recordedByPersonId: optStr(row, 'recorded_by_person_id'),
     createdAt: str(row, 'created_at'),
     updatedAt: str(row, 'updated_at'),
   }
@@ -189,6 +192,7 @@ export function paymentToRow(payment: Payment) {
     reference: payment.reference ?? null,
     status: payment.status,
     notes: payment.notes ?? null,
+    recorded_by_person_id: payment.recordedByPersonId ?? null,
     created_at: payment.createdAt,
     updated_at: payment.updatedAt,
   }
@@ -209,6 +213,7 @@ export function mapPayout(row: Row): Payout {
     reference: optStr(row, 'reference'),
     status: str(row, 'status') as Payout['status'],
     notes: optStr(row, 'notes'),
+    recordedByPersonId: optStr(row, 'recorded_by_person_id'),
     createdAt: str(row, 'created_at'),
     updatedAt: str(row, 'updated_at'),
   }
@@ -229,6 +234,7 @@ export function payoutToRow(payout: Payout) {
     reference: payout.reference ?? null,
     status: payout.status,
     notes: payout.notes ?? null,
+    recorded_by_person_id: payout.recordedByPersonId ?? null,
     created_at: payout.createdAt,
     updated_at: payout.updatedAt,
   }
