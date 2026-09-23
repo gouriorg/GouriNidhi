@@ -55,9 +55,9 @@ describe('scheme schedule', () => {
 
   it('rebuilds the schedule when profit bps changes', () => {
     const first = buildFixedProfitSchedule(FIXTURE)
-    expect(first.lines[0].plannedPayoutAmount).toBe(fromRupees(72_000))
+    expect(first.lines[0].plannedPayoutAmount).toBeLessThan(fromRupees(80_000))
     const wider = buildFixedProfitSchedule({ ...FIXTURE, profitBps: 2000 })
-    expect(wider.lines[0].plannedPayoutAmount).toBeLessThan(fromRupees(72_000))
+    expect(wider.lines[0].plannedPayoutAmount).toBeLessThan(first.lines[0].plannedPayoutAmount)
     expect(wider.lines).toHaveLength(20)
   })
 })

@@ -19,6 +19,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   destructive = false,
+  confirmDisabled = false,
   onConfirm,
   children,
 }: {
@@ -29,6 +30,7 @@ export function ConfirmDialog({
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
+  confirmDisabled?: boolean
   onConfirm: () => void | Promise<void>
   children?: ReactNode
 }) {
@@ -46,6 +48,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             variant={destructive ? 'destructive' : 'default'}
+            disabled={confirmDisabled}
             onClick={async () => {
               await onConfirm()
               onOpenChange(false)

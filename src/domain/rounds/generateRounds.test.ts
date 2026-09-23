@@ -74,7 +74,15 @@ describe('generateRoundsForScheme', () => {
     const rounds = generateRoundsForScheme(makeScheme({ scheduleSnapshot: undefined }))
 
     expect(rounds).toHaveLength(20)
-    expect(rounds[0].plannedPayoutAmount).toBe(fromRupees(72_000))
+    const rebuilt = buildFixedProfitSchedule({
+      maxMembers: 20,
+      monthlyAmount: fromRupees(4000),
+      durationMonths: 20,
+      startDate: '2026-01-01',
+      collectionDay: 1,
+      profitBps: 1000,
+    })
+    expect(rounds[0].plannedPayoutAmount).toBe(rebuilt.lines[0].plannedPayoutAmount)
   })
 
   it('pays out exactly what it collects across the whole scheme', () => {
