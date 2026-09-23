@@ -60,6 +60,11 @@ const SettingsPage = lazy(() =>
 const CashiersPage = lazy(() =>
   import('@/features/cashiers/CashiersPage').then((m) => ({ default: m.CashiersPage })),
 )
+const CallOverduePage = lazy(() =>
+  import('@/features/dashboard/admin/CallOverduePage').then((m) => ({
+    default: m.CallOverduePage,
+  })),
+)
 const CashierCollectPage = lazy(() =>
   import('@/features/dashboard/cashier/CashierCollectPage').then((m) => ({
     default: m.CashierCollectPage,
@@ -131,6 +136,7 @@ const router = createBrowserRouter([
               { index: true, element: page(<AdminDashboardPage />) },
               { path: 'members', element: page(<MembersPage />) },
               { path: 'cashiers', element: page(<CashiersPage />) },
+              { path: 'overdue', element: page(<CallOverduePage />) },
               { path: 'members/:personId', element: page(<MemberDetailPage />) },
               { path: 'schemes', element: page(<SchemesPage />) },
               { path: 'schemes/new', element: page(<SchemeFormPage />) },

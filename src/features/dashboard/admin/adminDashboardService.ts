@@ -50,16 +50,17 @@ export type AdminDashboard = {
     collectedOpen: Paise
     pendingOpen: Paise
   }[]
-  callAlerts: {
-    paymentId: string
-    personName: string
-    mobile: string
-    schemeCode: string
-    monthNumber: number
-    dueDate: string
-    pending: Paise
-    cashierName: string | null
-  }[]
+}
+
+export type CallAlert = {
+  paymentId: string
+  personName: string
+  mobile: string
+  schemeCode: string
+  monthNumber: number
+  dueDate: string
+  pending: Paise
+  cashierName: string | null
 }
 
 async function all<T>(table: string, map: (row: Record<string, unknown>) => T): Promise<T[]> {
@@ -167,39 +168,6 @@ export async function loadAdminDashboard(): Promise<AdminDashboard> {
     ).length,
     roundsTotal: rounds.length,
     overdueCount,
-    callAlerts: (() => {
-      const peopleById = new Map(people.map((person) => [person.id, person]))
-      return payments
-        .flatMap((payment) => {
-          if (payment.status === 'paid' || payment.status === 'waived') return []
-          const round = roundById.get(payment.roundId)
-          if (!round || round.dueDate >= today) return []
-          const person = peopleById.get(payment.personId)
-          const scheme = schemeById.get(payment.schemeId)
-          const membership = memberships.find(
-            (row) =>
-              row.status === 'active' &&
-              row.schemeId === payment.schemeId &&
-              row.personId === payment.personId,
-          )
-          const cashier = membership?.collectorPersonId
-            ? peopleById.get(membership.collectorPersonId)
-            : undefined
-          return [
-            {
-              paymentId: payment.id,
-              personName: person?.fullName ?? 'Member',
-              mobile: person?.mobile ?? '—',
-              schemeCode: scheme?.code ?? '—',
-              monthNumber: round.monthNumber,
-              dueDate: round.dueDate,
-              pending: payment.amountDue - payment.amountPaid,
-              cashierName: cashier?.fullName ?? null,
-            },
-          ]
-        })
-        .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.personName.localeCompare(b.personName))
-    })(),
     upcomingDues,
     collectionByScheme,
     cashierCount: cashierRoles.length,
@@ -245,4 +213,51 @@ export async function loadAdminDashboard(): Promise<AdminDashboard> {
       actorLabel: log.actorLabel,
     })),
   }
+}
+
+export async function loadCallAlerts(): Promise<CallAlert[]> {
+  await roundsRepository.openDueCollections()
+  const today = todayIso()
+  const [people, schemes, memberships, rounds, payments] = await Promise.all([
+    all('people', mapPerson),
+    all('schemes', mapScheme),
+    all('scheme_members', mapMembership),
+    all('rounds', mapRound),
+    all('payments', mapPayment),
+  ])
+
+  const peopleById = new Map(people.map((person) => [person.id, person]))
+  const schemeById = new Map(schemes.map((scheme) => [scheme.id, scheme]))
+  const roundById = new Map(rounds.map((round) => [round.id, round]))
+
+  return payments
+    .flatMap((payment) => {
+      if (payment.status === 'paid' || payment.status === 'waived') return []
+      const round = roundById.get(payment.roundId)
+      if (!round || round.dueDate >= today) return []
+      const person = peopleById.get(payment.personId)
+      const scheme = schemeById.get(payment.schemeId)
+      const membership = memberships.find(
+        (row) =>
+          row.status === 'active' &&
+          row.schemeId === payment.schemeId &&
+          row.personId === payment.personId,
+      )
+      const cashier = membership?.collectorPersonId
+        ? peopleById.get(membership.collectorPersonId)
+        : undefined
+      return [
+        {
+          paymentId: payment.id,
+          personName: person?.fullName ?? 'Member',
+          mobile: person?.mobile ?? '—',
+          schemeCode: scheme?.code ?? '—',
+          monthNumber: round.monthNumber,
+          dueDate: round.dueDate,
+          pending: payment.amountDue - payment.amountPaid,
+          cashierName: cashier?.fullName ?? null,
+        },
+      ]
+    })
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.personName.localeCompare(b.personName))
 }

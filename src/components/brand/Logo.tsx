@@ -1,4 +1,9 @@
+import { useLayoutEffect, useRef, useState } from 'react'
+
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+
+const BRAND_SUBTITLE = 'Chit Fund Management Made Simple'
 
 /** GouriNidhi mark. Change the brand look here only. */
 export function LogoMark({ className }: { className?: string }) {
@@ -23,18 +28,50 @@ export function BrandLockup({
   showSubtitle?: boolean
 }) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div className={cn('flex min-w-0 items-center gap-2.5', className)}>
       <LogoMark />
-      <div className="min-w-0 leading-tight">
-        <div className="font-[family-name:var(--font-display)] text-base font-bold tracking-tight">
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="truncate font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
           GouriNidhi
         </div>
         {showSubtitle && (
-          <div className="text-muted-foreground truncate text-xs">
-            Chit Fund Management Made Simple
-          </div>
+          <TruncatingText
+            text={BRAND_SUBTITLE}
+            className="text-muted-foreground text-[10px] leading-tight"
+          />
         )}
       </div>
     </div>
+  )
+}
+
+function TruncatingText({ text, className }: { text: string; className?: string }) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const [overflowed, setOverflowed] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const measure = () => setOverflowed(el.scrollWidth > el.clientWidth + 1)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [text])
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <p ref={ref} className={cn('truncate', className)}>
+          {text}
+        </p>
+      </TooltipTrigger>
+      {overflowed ? (
+        <TooltipContent side="bottom" align="start">
+          {text}
+        </TooltipContent>
+      ) : null}
+    </Tooltip>
   )
 }

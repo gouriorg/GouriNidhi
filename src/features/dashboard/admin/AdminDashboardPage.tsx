@@ -4,7 +4,6 @@ import {
   BanknoteIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
-  PhoneIcon,
   PlusIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -97,7 +96,15 @@ export function AdminDashboardPage() {
             <StatCard
               label="Pending collection"
               value={<MoneyText amount={data.pendingNow} />}
-              hint={data.overdueCount > 0 ? `${data.overdueCount} overdue` : 'Nothing overdue'}
+              hint={
+                data.overdueCount > 0 ? (
+                  <Link to="/overdue" className="text-primary hover:underline">
+                    {data.overdueCount} overdue — open call list
+                  </Link>
+                ) : (
+                  'Nothing overdue'
+                )
+              }
               tone={data.pendingNow > 0 ? 'warning' : 'success'}
               icon={data.overdueCount > 0 ? AlertTriangleIcon : CheckCircle2Icon}
             />
@@ -137,43 +144,6 @@ export function AdminDashboardPage() {
               icon={AlertTriangleIcon}
             />
           </div>
-
-          {data.callAlerts.length > 0 && (
-            <Card className="border-destructive/40 bg-destructive/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PhoneIcon className="size-5" />
-                  Call overdue members
-                </CardTitle>
-                <CardDescription>
-                  These members missed the monthly due day. Call them, or ask their cashier to collect.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="divide-border divide-y">
-                  {data.callAlerts.map((alert) => (
-                    <li key={alert.paymentId} className="flex flex-wrap items-start justify-between gap-3 py-3">
-                      <div>
-                        <p className="text-sm font-medium">{alert.personName}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {alert.schemeCode} · {formatShortMonth(alert.dueDate)} · due {formatDisplayDate(alert.dueDate)}
-                          {alert.cashierName ? ` · cashier ${alert.cashierName}` : ' · no cashier'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <a href={`tel:${alert.mobile}`} className="text-primary tabular text-sm font-medium hover:underline">
-                          {alert.mobile}
-                        </a>
-                        <p className="text-muted-foreground text-xs">
-                          <MoneyText amount={alert.pending} /> pending
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
 
           <Card>
             <CardHeader>
