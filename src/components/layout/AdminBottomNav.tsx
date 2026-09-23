@@ -19,7 +19,7 @@ const primaryTabs = [
 ]
 
 /** Thumb-reach navigation for phones. */
-export function AdminBottomNav() {
+export function AdminBottomNav({ pinned = true }: { pinned?: boolean }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const { pathname } = useLocation()
   const moreActive = adminMoreNavItems.some((item) => pathname.startsWith(item.to))
@@ -27,7 +27,10 @@ export function AdminBottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="bg-background/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur lg:hidden"
+      className={cn(
+        'bg-background/95 border-t backdrop-blur lg:hidden',
+        pinned && 'fixed inset-x-0 bottom-0 z-40',
+      )}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="grid grid-cols-4">

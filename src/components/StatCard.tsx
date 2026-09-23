@@ -14,7 +14,7 @@ export function StatCard({
 }: {
   label: string
   value: ReactNode
-  hint?: string
+  hint?: ReactNode
   icon?: LucideIcon
   tone?: 'default' | 'success' | 'warning' | 'destructive'
   className?: string
@@ -22,7 +22,7 @@ export function StatCard({
   const toneClass = {
     default: 'bg-primary/10 text-primary',
     success: 'bg-success/12 text-success',
-    warning: 'bg-warning/18 text-warning-foreground',
+    warning: 'bg-warning/18 text-warning',
     destructive: 'bg-destructive/12 text-destructive',
   }[tone]
 

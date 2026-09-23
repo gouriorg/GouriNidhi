@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { useRegisterPageChrome } from '@/components/layout/page-chrome'
 import { cn } from '@/lib/utils'
 
 export function PageHeader({
@@ -13,6 +14,9 @@ export function PageHeader({
   actions?: ReactNode
   className?: string
 }) {
+  const inChrome = useRegisterPageChrome({ title, description, actions })
+  if (inChrome) return null
+
   return (
     <div
       className={cn(
