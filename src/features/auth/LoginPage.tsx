@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, LoaderCircleIcon } from 'lucide-react'
+import { LoaderCircleIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AUTH_WARNING } from '@/config/auth'
 import { getSupabaseProject, projectHostLabel } from '@/config/supabaseProject'
 import { ConnectSupabaseForm } from '@/features/settings/ConnectSupabaseForm'
 import { SiteFooter } from '@/components/layout/SiteFooter'
@@ -78,7 +77,7 @@ export function LoginPage() {
                   inputMode="text"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="admin or your mobile number"
+                  placeholder="10-digit mobile number"
                   aria-invalid={Boolean(error)}
                   autoFocus
                 />
@@ -96,7 +95,7 @@ export function LoginPage() {
                   aria-invalid={Boolean(error)}
                 />
                 <p className="text-muted-foreground text-xs">
-                  Members: use your mobile number in both fields.
+                  Use your 10-digit mobile number in both fields.
                 </p>
               </div>
 
@@ -113,11 +112,6 @@ export function LoginPage() {
             </form>
           </CardContent>
         </Card>
-
-        <div className="border-warning/35 bg-warning/10 text-warning-foreground mt-6 flex gap-2 rounded-lg border p-3 text-xs">
-          <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-          <p>{AUTH_WARNING}</p>
-        </div>
 
         <p className="text-muted-foreground mt-6 text-center text-xs">
           Shared database: {projectHost ?? 'not connected'}. Change it here or by replacing

@@ -6,7 +6,7 @@ import type { PersonRole } from '@/types/entities'
 
 /**
  * Workspace session, hydrated from Supabase Auth.
- * Admin is a real Auth user (admin@gourinidhi.local). Members and cashiers are people rows.
+ * Admins, members, and cashiers are people rows; admin is an extra role.
  */
 export type Session =
   | { kind: 'admin' }
@@ -44,8 +44,12 @@ export function isCashierSession(session: Session): boolean {
   return session?.kind === 'member' && session.roles.includes('cashier')
 }
 
+export function isAdminSession(session: Session): boolean {
+  return session?.kind === 'admin' || (session?.kind === 'member' && session.roles.includes('admin'))
+}
+
 export function homePath(session: Session): string {
-  if (session?.kind === 'admin') return '/'
+  if (isAdminSession(session)) return '/'
   if (isCashierSession(session)) return '/collect'
   if (session?.kind === 'member') return '/me'
   return '/login'
@@ -84,5 +88,5 @@ export const useSessionStore = create<SessionState>()((set) => ({
 }))
 
 export const useSession = () => useSessionStore((s) => s.session)
-export const useIsAdmin = () => useSessionStore((s) => s.session?.kind === 'admin')
+export const useIsAdmin = () => isAdminSession(useSessionStore((s) => s.session))
 export const useIsCashier = () => isCashierSession(useSessionStore((s) => s.session))

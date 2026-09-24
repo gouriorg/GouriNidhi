@@ -6,11 +6,11 @@ export type Timestamp = string
 export type DateOnly = string
 
 export type PersonStatus = 'active' | 'inactive'
-export type PersonRole = 'member' | 'cashier'
+export type PersonRole = 'member' | 'cashier' | 'admin'
 
 /**
- * Every person record is a Member. Admin is a hardcoded login, not a row here.
- * `mobile` doubles as the member's username and password for the MVP login.
+ * Every person record is a Member. A person can also be a cashier and/or admin.
+ * `mobile` is the MVP username and password. At least one person must stay admin.
  */
 export type Person = {
   id: string

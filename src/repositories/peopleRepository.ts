@@ -108,6 +108,30 @@ export const peopleRepository = {
   },
 
   async setStatus(id: string, status: Person['status']): Promise<void> {
+    if (status === 'inactive') {
+      const person = await peopleRepository.get(id)
+      if (person?.authUserId) {
+        const { data, error } = await getSupabase()
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'admin')
+        throwIfError(error)
+        const adminUserIds = new Set((data ?? []).map((row) => String(row.user_id)))
+        if (adminUserIds.has(person.authUserId)) {
+          const people = await peopleRepository.list()
+          const otherActiveAdmins = people.filter(
+            (row) =>
+              row.id !== id &&
+              row.status === 'active' &&
+              row.authUserId &&
+              adminUserIds.has(row.authUserId),
+          )
+          if (otherActiveAdmins.length === 0) {
+            throw new RepositoryError('Keep at least one member as admin.')
+          }
+        }
+      }
+    }
     await invokeMemberAdmin({ action: 'setStatus', id, status })
     notifyDataChanged()
   },

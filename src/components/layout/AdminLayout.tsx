@@ -1,10 +1,16 @@
-import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react'
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 
 import { AdminBottomNav } from '@/components/layout/AdminBottomNav'
+import { SessionAccountBar } from '@/components/layout/SessionAccountBar'
 import { MenuSearchButton, MenuSearchProvider } from '@/components/layout/MenuSearch'
-import { adminMenuCommands, adminNavItems, type NavItem } from '@/components/layout/nav-items'
+import {
+  adminMenuCommands,
+  adminMyAccountItem,
+  adminNavItems,
+  type NavItem,
+} from '@/components/layout/nav-items'
 import { PageChromeProvider, usePageChrome } from '@/components/layout/page-chrome'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { BrandLockup, LogoMark } from '@/components/brand/Logo'
@@ -27,7 +33,12 @@ function readSidebarCollapsed() {
 }
 
 export function AdminLayout() {
-  const signOut = useSessionStore((s) => s.signOut)
+  const session = useSessionStore((s) => s.session)
+  const showMyAccount = session?.kind === 'member'
+  const navItems = showMyAccount ? [...adminNavItems, adminMyAccountItem] : adminNavItems
+  const menuCommands = showMyAccount
+    ? adminMenuCommands
+    : adminMenuCommands.filter((command) => command.to !== '/me')
   const [collapsed, setCollapsed] = useState(readSidebarCollapsed)
 
   function toggleSidebar() {
@@ -44,7 +55,7 @@ export function AdminLayout() {
 
   return (
     <PageChromeProvider>
-      <MenuSearchProvider commands={adminMenuCommands}>
+      <MenuSearchProvider commands={menuCommands}>
         <div className="bg-background flex h-dvh flex-col lg:flex-row">
           <aside
             className={cn(
@@ -76,7 +87,7 @@ export function AdminLayout() {
               )}
             </div>
             <nav aria-label="Main" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-              {adminNavItems.map(({ to, label, icon: Icon, end }) => (
+              {navItems.map(({ to, label, icon: Icon, end }) => (
                 <SidebarLink
                   key={to}
                   to={to}
@@ -87,22 +98,8 @@ export function AdminLayout() {
                 />
               ))}
             </nav>
-            <div className={cn('border-sidebar-border flex h-12 shrink-0 items-center border-t px-3')}>
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full" aria-label="Sign out" onClick={signOut}>
-                      <LogOutIcon className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Sign out</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
-                  <LogOutIcon className="size-4" />
-                  Sign out
-                </Button>
-              )}
+            <div className="border-sidebar-border shrink-0 border-t px-3 py-3">
+              <SessionAccountBar sidebar collapsed={collapsed} />
             </div>
           </aside>
 
@@ -115,8 +112,11 @@ export function AdminLayout() {
               </div>
             </main>
 
+            <div className="bg-sidebar border-t px-4 py-2 lg:hidden">
+              <SessionAccountBar />
+            </div>
             <SiteFooter pinned={false} />
-            <AdminBottomNav pinned={false} />
+            <AdminBottomNav pinned={false} showMyAccount={showMyAccount} />
           </div>
         </div>
       </MenuSearchProvider>
@@ -132,7 +132,6 @@ function AdminTopBar({
   onExpandSidebar: () => void
 }) {
   const chrome = usePageChrome()
-  const signOut = useSessionStore((s) => s.signOut)
 
   return (
     <>
@@ -152,9 +151,6 @@ function AdminTopBar({
           <MenuSearchButton />
           <OfflineBadge />
           <ThemeToggle />
-          <Button variant="ghost" size="icon-sm" aria-label="Sign out" onClick={signOut}>
-            <LogOutIcon className="size-4" />
-          </Button>
         </div>
       </header>
 

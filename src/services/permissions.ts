@@ -1,5 +1,5 @@
 import type { Session } from '@/stores/session'
-import { isCashierSession } from '@/stores/session'
+import { isAdminSession, isCashierSession } from '@/stores/session'
 
 export type AppRole = 'admin' | 'member' | 'cashier'
 
@@ -47,7 +47,7 @@ export function can(role: AppRole, action: Action): boolean {
 
 export function roleOf(session: Session): AppRole | null {
   if (!session) return null
-  if (session.kind === 'admin') return 'admin'
+  if (isAdminSession(session)) return 'admin'
   if (isCashierSession(session)) return 'cashier'
   return 'member'
 }

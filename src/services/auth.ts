@@ -1,4 +1,4 @@
-import { ADMIN_CREDENTIALS, ADMIN_EMAIL, memberEmail } from '@/config/auth'
+import { memberEmail } from '@/config/auth'
 import { getSupabase } from '@/lib/supabase'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import type { Session } from '@/stores/session'
@@ -15,34 +15,33 @@ async function rolesFor(userId: string): Promise<string[]> {
 
 export async function sessionFromUser(userId: string, email?: string | null): Promise<Session> {
   const roles = await rolesFor(userId)
-  if (roles.includes('admin') || email === ADMIN_EMAIL) {
-    return { kind: 'admin' }
-  }
-
   const person =
     (await peopleRepository.findByAuthUserId(userId)) ??
     (email?.endsWith('@members.gourinidhi.local')
       ? await peopleRepository.findByMobile(email.split('@')[0] ?? '')
       : undefined)
 
-  if (!person) return null
-  if (person.status !== 'active') return null
-
-  const personRoles = roles.filter((role): role is PersonRole => role === 'member' || role === 'cashier')
-  if (personRoles.length === 0) personRoles.push('member')
-
-  return {
-    kind: 'member',
-    personId: person.id,
-    fullName: person.fullName,
-    mobile: person.mobile,
-    roles: personRoles,
+  if (person) {
+    if (person.status !== 'active') return null
+    const personRoles = roles.filter(
+      (role): role is PersonRole => role === 'member' || role === 'cashier' || role === 'admin',
+    )
+    if (personRoles.length === 0) personRoles.push('member')
+    return {
+      kind: 'member',
+      personId: person.id,
+      fullName: person.fullName,
+      mobile: person.mobile,
+      roles: personRoles,
+    }
   }
+
+  return null
 }
 
 /**
- * Username + password on the login screen. Admin is still admin/admin; members
- * and cashiers use their 10-digit mobile as both fields. Auth is checked on Supabase.
+ * Username + password on the login screen. Members, cashiers, and assigned
+ * admins use their 10-digit mobile as both fields. Auth is checked on Supabase.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
   const user = username.trim()
@@ -52,30 +51,11 @@ export async function login(username: string, password: string): Promise<LoginRe
     return { ok: false, message: 'Enter both a username and a password.' }
   }
 
-  const supabase = getSupabase()
-
-  if (user === ADMIN_CREDENTIALS.username && pass === ADMIN_CREDENTIALS.password) {
-    try {
-      await supabase.functions.invoke('bootstrap-admin', { body: {} })
-    } catch {
-      // Optional: the first admin can already exist from SQL bootstrap.
-    }
-    const { error } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
-      password: ADMIN_CREDENTIALS.password,
-    })
-    if (error) {
-      return {
-        ok: false,
-        message: error.message || 'Could not sign in as admin.',
-      }
-    }
-    return { ok: true, session: { kind: 'admin' } }
-  }
-
   if (!/^\d{10}$/.test(user) || pass !== user) {
     return { ok: false, message: 'Incorrect username or password.' }
   }
+
+  const supabase = getSupabase()
 
   const { error } = await supabase.auth.signInWithPassword({
     email: memberEmail(user),
