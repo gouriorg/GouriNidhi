@@ -21,7 +21,7 @@ export function SiteFooter({
   return (
     <footer
       className={cn(
-        'bg-sidebar text-sidebar-foreground flex h-12 shrink-0 items-center border-t',
+        'bg-sidebar text-sidebar-foreground flex min-h-14 shrink-0 items-center border-t',
         pinned && 'bg-sidebar/95 fixed inset-x-0 z-30 backdrop-blur',
         pinned && (offset === 'admin' ? 'bottom-14 lg:right-0 lg:bottom-0 lg:left-64' : 'bottom-0'),
         className,

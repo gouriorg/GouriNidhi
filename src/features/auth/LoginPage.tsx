@@ -6,7 +6,7 @@ import { BrandLockup } from '@/components/brand/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { MobileInput } from '@/components/MobileInput'
 import { Label } from '@/components/ui/label'
 import { getSupabaseProject, projectHostLabel } from '@/config/supabaseProject'
 import { ConnectSupabaseForm } from '@/features/settings/ConnectSupabaseForm'
@@ -70,11 +70,10 @@ export function LoginPage() {
             <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
               <div className="grid gap-2">
                 <Label htmlFor="username">Username</Label>
-                <Input
+                <MobileInput
                   id="username"
                   name="username"
                   autoComplete="username"
-                  inputMode="text"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                   placeholder="10-digit mobile number"
@@ -85,7 +84,7 @@ export function LoginPage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
+                <MobileInput
                   id="password"
                   name="password"
                   type="password"

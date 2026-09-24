@@ -56,67 +56,80 @@ export function AdminLayout() {
   return (
     <PageChromeProvider>
       <MenuSearchProvider commands={menuCommands}>
-        <div className="bg-background flex h-dvh flex-col lg:flex-row">
-          <aside
-            className={cn(
-              'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex',
-              collapsed ? 'w-20' : 'w-64',
-            )}
-          >
-            <div
+        <div className="bg-background flex h-dvh flex-col">
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            <aside
               className={cn(
-                HEADER_BAR,
-                'border-sidebar-border px-3',
-                collapsed ? 'justify-center' : 'gap-1',
+                'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex',
+                collapsed ? 'w-20' : 'w-64',
               )}
             >
-              {collapsed ? (
-                <LogoMark />
-              ) : (
-                <>
-                  <BrandLockup className="min-w-0 flex-1" />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Collapse sidebar"
-                    onClick={toggleSidebar}
-                  >
-                    <PanelLeftCloseIcon className="size-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-            <nav aria-label="Main" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-              {navItems.map(({ to, label, icon: Icon, end }) => (
-                <SidebarLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  label={label}
-                  collapsed={collapsed}
-                  icon={Icon}
-                />
-              ))}
-            </nav>
-            <div className="border-sidebar-border shrink-0 border-t px-3 py-3">
-              <SessionAccountBar sidebar collapsed={collapsed} />
-            </div>
-          </aside>
-
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <AdminTopBar collapsed={collapsed} onExpandSidebar={toggleSidebar} />
-
-            <main className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6">
-                <Outlet />
+              <div
+                className={cn(
+                  HEADER_BAR,
+                  'border-sidebar-border px-3',
+                  collapsed ? 'justify-center' : 'gap-1',
+                )}
+              >
+                {collapsed ? (
+                  <LogoMark />
+                ) : (
+                  <>
+                    <BrandLockup className="min-w-0 flex-1" />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Collapse sidebar"
+                      onClick={toggleSidebar}
+                    >
+                      <PanelLeftCloseIcon className="size-4" />
+                    </Button>
+                  </>
+                )}
               </div>
-            </main>
+              <nav aria-label="Main" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+                {navItems.map(({ to, label, icon: Icon, end }) => (
+                  <SidebarLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    label={label}
+                    collapsed={collapsed}
+                    icon={Icon}
+                  />
+                ))}
+              </nav>
+            </aside>
 
-            <div className="bg-sidebar border-t px-4 py-2 lg:hidden">
-              <SessionAccountBar />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <AdminTopBar collapsed={collapsed} onExpandSidebar={toggleSidebar} />
+
+              <main className="min-h-0 flex-1 overflow-y-auto">
+                <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6">
+                  <Outlet />
+                </div>
+              </main>
+
+              <div className="bg-sidebar flex h-14 items-center border-t px-4 lg:hidden">
+                <SessionAccountBar className="w-full" />
+              </div>
+              <div className="lg:hidden">
+                <SiteFooter pinned={false} />
+              </div>
+              <AdminBottomNav pinned={false} showMyAccount={showMyAccount} />
             </div>
-            <SiteFooter pinned={false} />
-            <AdminBottomNav pinned={false} showMyAccount={showMyAccount} />
+          </div>
+
+          <div className="border-sidebar-border hidden min-h-14 shrink-0 border-t lg:flex">
+            <div
+              className={cn(
+                'bg-sidebar text-sidebar-foreground flex items-center border-r px-3',
+                collapsed ? 'w-20 py-2' : 'w-64',
+              )}
+            >
+              <SessionAccountBar sidebar collapsed={collapsed} className="w-full" />
+            </div>
+            <SiteFooter pinned={false} className="min-h-0 flex-1 border-t-0" />
           </div>
         </div>
       </MenuSearchProvider>

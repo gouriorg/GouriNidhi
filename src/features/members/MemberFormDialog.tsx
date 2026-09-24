@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { MobileInput } from '@/components/MobileInput'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -107,10 +108,8 @@ export function MemberFormDialog({
 
           <div className="grid gap-2">
             <Label htmlFor="mobile">Mobile number</Label>
-            <Input
+            <MobileInput
               id="mobile"
-              inputMode="numeric"
-              maxLength={10}
               {...form.register('mobile')}
               aria-invalid={Boolean(form.formState.errors.mobile)}
               placeholder="9876543210"

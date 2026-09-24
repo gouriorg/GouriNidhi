@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { isValidDateOnly } from '@/lib/dates'
+import { normalizeIndianMobileInput } from '@/lib/mobile'
 
 const paiseSchema = z
   .number()
@@ -16,7 +17,8 @@ const idSchema = z.string().min(1)
 export const mobileSchema = z
   .string()
   .trim()
-  .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
+  .transform(normalizeIndianMobileInput)
+  .refine((value) => /^[6-9]\d{9}$/.test(value), 'Enter a valid 10-digit Indian mobile number')
 
 export const personSchema = z.object({
   id: idSchema,

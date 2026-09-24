@@ -45,8 +45,8 @@ export function CashierLayout() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24">
         <Outlet />
       </main>
-      <div className="bg-sidebar mx-auto w-full max-w-5xl border-t px-4 py-2">
-        <SessionAccountBar />
+      <div className="bg-sidebar mx-auto flex h-14 w-full max-w-5xl items-center border-t px-4">
+        <SessionAccountBar className="w-full" />
       </div>
       <SiteFooter />
     </div>

@@ -1,4 +1,5 @@
 import { isValidDateOnly } from '@/lib/dates'
+import { normalizeIndianMobileInput } from '@/lib/mobile'
 import { fromRupees, percentToBps } from '@/domain/money/money'
 import {
   canBuildSchedule,
@@ -55,9 +56,8 @@ export function checkName(raw: string, label: string): { ok: true; value: string
 }
 
 export function parseMobile(raw: string): { ok: true; value: string } | { ok: false; message: string } {
-  let digits = raw.trim().replace(/[\s()-]/g, '')
-  if (digits.startsWith('+91')) digits = digits.slice(3)
-  if (digits.startsWith('91') && digits.length === 12) digits = digits.slice(2)
+  const digits = normalizeIndianMobileInput(raw)
+  if (!raw.trim()) return { ok: false, message: 'Mobile number is required.' }
   if (!digits) return { ok: false, message: 'Mobile number is required.' }
   if (!/^[6-9]\d{9}$/.test(digits)) {
     return { ok: false, message: 'Enter a valid 10-digit Indian mobile number.' }

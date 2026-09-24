@@ -1,4 +1,5 @@
 import { personSchema } from '@/db/schema'
+import { normalizeIndianMobileInput } from '@/lib/mobile'
 import { getSupabase } from '@/lib/supabase'
 import { mapPerson, throwIfError } from '@/lib/mappers'
 import { notifyDataChanged } from '@/stores/dataVersion'
@@ -16,7 +17,7 @@ export type PersonInput = {
 function normalise(input: PersonInput) {
   return {
     fullName: input.fullName.trim(),
-    mobile: input.mobile.trim(),
+    mobile: normalizeIndianMobileInput(input.mobile),
     address: input.address?.trim() || undefined,
     notes: input.notes?.trim() || undefined,
   }
@@ -25,7 +26,7 @@ function normalise(input: PersonInput) {
 function normalisePartial(input: Partial<PersonInput>) {
   const data: Partial<ReturnType<typeof normalise>> = {}
   if (input.fullName !== undefined) data.fullName = input.fullName.trim()
-  if (input.mobile !== undefined) data.mobile = input.mobile.trim()
+  if (input.mobile !== undefined) data.mobile = normalizeIndianMobileInput(input.mobile)
   if (input.address !== undefined) data.address = input.address.trim() || undefined
   if (input.notes !== undefined) data.notes = input.notes.trim() || undefined
   return data

@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { MobileInput } from '@/components/MobileInput'
 import { Input } from '@/components/ui/input'
 import { cashiersRepository, type CashierRecord } from '@/repositories/cashiersRepository'
 import { peopleRepository } from '@/repositories/peopleRepository'
@@ -330,11 +331,10 @@ function AddCashierDialog({
         <div className="grid gap-2">
           <p className="text-sm font-medium">New person</p>
           <Input placeholder="Full name" value={newName} onChange={(event) => setNewName(event.target.value)} />
-          <Input
+          <MobileInput
             placeholder="10-digit mobile"
-            inputMode="numeric"
             value={newMobile}
-            onChange={(event) => setNewMobile(event.target.value.replace(/\D/g, '').slice(0, 10))}
+            onChange={(event) => setNewMobile(event.target.value)}
           />
           <Button
             variant="secondary"

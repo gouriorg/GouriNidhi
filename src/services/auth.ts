@@ -1,4 +1,5 @@
 import { memberEmail } from '@/config/auth'
+import { normalizeIndianMobileInput } from '@/lib/mobile'
 import { getSupabase } from '@/lib/supabase'
 import { peopleRepository } from '@/repositories/peopleRepository'
 import type { Session } from '@/stores/session'
@@ -44,8 +45,8 @@ export async function sessionFromUser(userId: string, email?: string | null): Pr
  * admins use their 10-digit mobile as both fields. Auth is checked on Supabase.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
-  const user = username.trim()
-  const pass = password.trim()
+  const user = normalizeIndianMobileInput(username)
+  const pass = normalizeIndianMobileInput(password)
 
   if (!user || !pass) {
     return { ok: false, message: 'Enter both a username and a password.' }
