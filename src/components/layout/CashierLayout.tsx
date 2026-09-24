@@ -1,19 +1,18 @@
-import { BanknoteIcon, LogOutIcon, UserIcon, WalletIcon } from 'lucide-react'
+import { BanknoteIcon, UserIcon, WalletIcon } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 
 import { BrandLockup } from '@/components/brand/Logo'
+import { SessionAccountBar } from '@/components/layout/SessionAccountBar'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { OfflineBadge } from '@/components/OfflineBadge'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { Button } from '@/components/ui/button'
 import { membershipsRepository } from '@/repositories/membershipsRepository'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { isCashierSession, useSession, useSessionStore } from '@/stores/session'
+import { isCashierSession, useSession } from '@/stores/session'
 import { cn } from '@/lib/utils'
 
 export function CashierLayout() {
   const session = useSession()
-  const signOut = useSessionStore((s) => s.signOut)
   const personId = session?.kind === 'member' ? session.personId : undefined
   const memberships = useLiveQuery(
     () => (personId ? membershipsRepository.listForPerson(personId) : Promise.resolve([])),
@@ -29,9 +28,6 @@ export function CashierLayout() {
           <div className="flex items-center gap-1">
             <OfflineBadge />
             <ThemeToggle />
-            <Button variant="ghost" size="icon-sm" aria-label="Sign out" onClick={signOut}>
-              <LogOutIcon className="size-4" />
-            </Button>
           </div>
         </div>
         {isCashierSession(session) && (
@@ -49,6 +45,9 @@ export function CashierLayout() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24">
         <Outlet />
       </main>
+      <div className="bg-sidebar mx-auto flex h-14 w-full max-w-5xl items-center border-t px-4">
+        <SessionAccountBar className="w-full" />
+      </div>
       <SiteFooter />
     </div>
   )

@@ -1,14 +1,28 @@
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { AlertTriangleIcon, BanknoteIcon, ShieldIcon, UserIcon } from 'lucide-react'
+import { BanknoteIcon, ShieldIcon, UserIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ADMIN_CREDENTIALS, AUTH_WARNING } from '@/config/auth'
-import { peopleRepository } from '@/repositories/peopleRepository'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { adminsRepository } from '@/repositories/adminsRepository'
 import { cashiersRepository } from '@/repositories/cashiersRepository'
+import { peopleRepository } from '@/repositories/peopleRepository'
+import { toReadableError } from '@/repositories/errors'
+import type { Person } from '@/types/entities'
 
-/** Explains the two roles. There is deliberately no promote-to-admin action yet. */
 export function RolesPage() {
   const memberCount = useLiveQuery(
     () =>
@@ -16,29 +30,28 @@ export function RolesPage() {
     [],
   )
   const cashierCount = useLiveQuery(() => cashiersRepository.list().then((rows) => rows.length), [])
+  const admins = useLiveQuery(() => adminsRepository.list(), [])
+  const [addOpen, setAddOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<Person | null>(null)
 
   return (
     <>
       <PageHeader
         title="Roles"
-        description="GouriNidhi has three roles: Admin, Member, and Cashier. A person can be both a member and a cashier."
+        description="Admin, Member, and Cashier. A person can hold more than one role and still use their mobile login."
       />
-
-      <div className="border-warning/35 bg-warning/10 text-warning-foreground mb-6 flex gap-2 rounded-lg border p-3 text-sm">
-        <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-        <p>{AUTH_WARNING}</p>
-      </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldIcon className="text-primary size-5" /> Admin
-              <Badge variant="muted">1 built-in login</Badge>
+              <Badge variant="muted">
+                {admins?.length ?? 0} member{(admins?.length ?? 0) === 1 ? '' : 's'}
+              </Badge>
             </CardTitle>
             <CardDescription>
-              Signs in with the username <code className="font-mono">{ADMIN_CREDENTIALS.username}</code>.
-              This account is not a member record.
+              Assigned members sign in with their mobile number. Keep at least one admin.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm">
@@ -51,6 +64,7 @@ export function RolesPage() {
               <li>Add cashiers and assign members to them</li>
               <li>Record contributions and payouts</li>
               <li>Read reports and export or restore backups</li>
+              <li>Open My account for their own schemes, if they are a member</li>
             </ul>
           </CardContent>
         </Card>
@@ -110,14 +124,159 @@ export function RolesPage() {
       </div>
 
       <Card className="mt-5">
-        <CardHeader>
-          <CardTitle>Planned for later</CardTitle>
-          <CardDescription>
-            Multiple admin accounts and a properly hashed password are intentionally left out of
-            this version. Cashier is the extra collection role; scheme membership is still separate.
-          </CardDescription>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Member admins</CardTitle>
+            <CardDescription>
+              Promote an existing member. They keep their mobile login and can still open My account.
+            </CardDescription>
+          </div>
+          <Button onClick={() => setAddOpen(true)}>Make admin</Button>
         </CardHeader>
+        <CardContent>
+          {!admins ? (
+            <p className="text-muted-foreground text-sm">Loading admins…</p>
+          ) : admins.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No members have the admin role. Make at least one member an admin so someone can open
+              this workspace.
+            </p>
+          ) : (
+            <ul className="divide-border divide-y rounded-md border">
+              {admins.map((person) => (
+                <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">{person.fullName}</p>
+                    <p className="text-muted-foreground tabular text-xs">{person.mobile}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={admins.length === 1}
+                    onClick={() => setRemoveTarget(person)}
+                  >
+                    Remove admin
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
       </Card>
+
+      <AddAdminDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        adminIds={new Set(admins?.map((row) => row.id) ?? [])}
+      />
+
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title={`Remove admin from ${removeTarget?.fullName}?`}
+        description="They stay a member (and a cashier, if they were one). They will sign in with the same mobile number and no longer see the admin workspace."
+        confirmLabel="Remove admin"
+        destructive
+        onConfirm={async () => {
+          if (!removeTarget) return
+          try {
+            await adminsRepository.remove(removeTarget.id)
+            toast.success('Admin role removed')
+          } catch (error) {
+            toast.error(toReadableError(error, 'Could not remove this admin.'))
+          }
+        }}
+      />
     </>
+  )
+}
+
+function AddAdminDialog({
+  open,
+  onOpenChange,
+  adminIds,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  adminIds: Set<string>
+}) {
+  const [search, setSearch] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const people = useLiveQuery(
+    () => peopleRepository.list().then((rows) => rows.filter((person) => person.status === 'active')),
+    [],
+  )
+
+  const candidates = useMemo(() => {
+    if (!people) return []
+    const needle = search.trim().toLowerCase()
+    return people
+      .filter((person) => !adminIds.has(person.id) && person.authUserId)
+      .filter(
+        (person) =>
+          !needle ||
+          person.fullName.toLowerCase().includes(needle) ||
+          person.mobile.includes(needle),
+      )
+  }, [people, search, adminIds])
+
+  async function promote(personId: string) {
+    setBusyId(personId)
+    try {
+      await adminsRepository.promote(personId)
+      toast.success('Admin role added')
+    } catch (error) {
+      toast.error(toReadableError(error, 'Could not make this person an admin.'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setSearch('')
+        onOpenChange(next)
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Make a member admin</DialogTitle>
+          <DialogDescription>
+            They keep the same mobile login and can still open My account for their own schemes.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          placeholder="Search by name or mobile"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <div className="max-h-72 overflow-y-auto">
+          {candidates.length === 0 ? (
+            <p className="text-muted-foreground py-8 text-center text-sm">No matching members.</p>
+          ) : (
+            <ul className="divide-border divide-y">
+              {candidates.map((person) => (
+                <li key={person.id} className="flex items-center justify-between gap-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">{person.fullName}</p>
+                    <p className="text-muted-foreground tabular text-xs">{person.mobile}</p>
+                  </div>
+                  <Button size="sm" disabled={busyId === person.id} onClick={() => void promote(person.id)}>
+                    Make admin
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -7,6 +7,7 @@ import {
   PlusIcon,
   SettingsIcon,
   ShieldIcon,
+  UserIcon,
   UsersIcon,
   WalletIcon,
   BanknoteIcon,
@@ -34,6 +35,9 @@ export const adminNavItems: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
+/** Shown in the admin chrome only when the signed-in admin is also a member. */
+export const adminMyAccountItem: NavItem = { to: '/me', label: 'My account', icon: UserIcon }
+
 /** Items shown behind "More" on mobile bottom tabs. */
 export const adminMoreNavItems: NavItem[] = adminNavItems.filter(
   (item) => !['/', '/members', '/schemes'].includes(item.to),
@@ -58,4 +62,10 @@ export const adminMenuCommands: MenuCommand[] = [
     ? [{ to: '/audit', label: 'Audit log', icon: HistoryIcon, keywords: ['history', 'log'] }]
     : []),
   { to: '/settings', label: 'Settings', icon: SettingsIcon, keywords: ['backup', 'supabase'] },
+  {
+    to: '/me',
+    label: 'My account',
+    icon: UserIcon,
+    keywords: ['member', 'self', 'profile', 'my schemes'],
+  },
 ]

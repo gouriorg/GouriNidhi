@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 
-import { homePath, isCashierSession, useSession } from '@/stores/session'
+import { homePath, isAdminSession, isCashierSession, useSession } from '@/stores/session'
 
 /** Unauthenticated visitors go to the login screen. */
 export function RequireSession() {
@@ -20,7 +20,7 @@ export function RequireSession() {
 export function RequireAdmin() {
   const session = useSession()
 
-  if (session?.kind !== 'admin') {
+  if (!isAdminSession(session)) {
     return <Navigate to={homePath(session)} replace />
   }
 

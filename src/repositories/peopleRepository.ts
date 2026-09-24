@@ -1,4 +1,5 @@
 import { personSchema } from '@/db/schema'
+import { normalizeIndianMobileInput } from '@/lib/mobile'
 import { getSupabase } from '@/lib/supabase'
 import { mapPerson, throwIfError } from '@/lib/mappers'
 import { notifyDataChanged } from '@/stores/dataVersion'
@@ -16,7 +17,7 @@ export type PersonInput = {
 function normalise(input: PersonInput) {
   return {
     fullName: input.fullName.trim(),
-    mobile: input.mobile.trim(),
+    mobile: normalizeIndianMobileInput(input.mobile),
     address: input.address?.trim() || undefined,
     notes: input.notes?.trim() || undefined,
   }
@@ -25,7 +26,7 @@ function normalise(input: PersonInput) {
 function normalisePartial(input: Partial<PersonInput>) {
   const data: Partial<ReturnType<typeof normalise>> = {}
   if (input.fullName !== undefined) data.fullName = input.fullName.trim()
-  if (input.mobile !== undefined) data.mobile = input.mobile.trim()
+  if (input.mobile !== undefined) data.mobile = normalizeIndianMobileInput(input.mobile)
   if (input.address !== undefined) data.address = input.address.trim() || undefined
   if (input.notes !== undefined) data.notes = input.notes.trim() || undefined
   return data
@@ -108,6 +109,30 @@ export const peopleRepository = {
   },
 
   async setStatus(id: string, status: Person['status']): Promise<void> {
+    if (status === 'inactive') {
+      const person = await peopleRepository.get(id)
+      if (person?.authUserId) {
+        const { data, error } = await getSupabase()
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'admin')
+        throwIfError(error)
+        const adminUserIds = new Set((data ?? []).map((row) => String(row.user_id)))
+        if (adminUserIds.has(person.authUserId)) {
+          const people = await peopleRepository.list()
+          const otherActiveAdmins = people.filter(
+            (row) =>
+              row.id !== id &&
+              row.status === 'active' &&
+              row.authUserId &&
+              adminUserIds.has(row.authUserId),
+          )
+          if (otherActiveAdmins.length === 0) {
+            throw new RepositoryError('Keep at least one member as admin.')
+          }
+        }
+      }
+    }
     await invokeMemberAdmin({ action: 'setStatus', id, status })
     notifyDataChanged()
   },

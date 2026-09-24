@@ -1,10 +1,16 @@
-import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react'
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 
 import { AdminBottomNav } from '@/components/layout/AdminBottomNav'
+import { SessionAccountBar } from '@/components/layout/SessionAccountBar'
 import { MenuSearchButton, MenuSearchProvider } from '@/components/layout/MenuSearch'
-import { adminMenuCommands, adminNavItems, type NavItem } from '@/components/layout/nav-items'
+import {
+  adminMenuCommands,
+  adminMyAccountItem,
+  adminNavItems,
+  type NavItem,
+} from '@/components/layout/nav-items'
 import { PageChromeProvider, usePageChrome } from '@/components/layout/page-chrome'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { BrandLockup, LogoMark } from '@/components/brand/Logo'
@@ -27,7 +33,12 @@ function readSidebarCollapsed() {
 }
 
 export function AdminLayout() {
-  const signOut = useSessionStore((s) => s.signOut)
+  const session = useSessionStore((s) => s.session)
+  const showMyAccount = session?.kind === 'member'
+  const navItems = showMyAccount ? [...adminNavItems, adminMyAccountItem] : adminNavItems
+  const menuCommands = showMyAccount
+    ? adminMenuCommands
+    : adminMenuCommands.filter((command) => command.to !== '/me')
   const [collapsed, setCollapsed] = useState(readSidebarCollapsed)
 
   function toggleSidebar() {
@@ -44,79 +55,81 @@ export function AdminLayout() {
 
   return (
     <PageChromeProvider>
-      <MenuSearchProvider commands={adminMenuCommands}>
-        <div className="bg-background flex h-dvh flex-col lg:flex-row">
-          <aside
-            className={cn(
-              'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex',
-              collapsed ? 'w-20' : 'w-64',
-            )}
-          >
-            <div
+      <MenuSearchProvider commands={menuCommands}>
+        <div className="bg-background flex h-dvh flex-col">
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            <aside
               className={cn(
-                HEADER_BAR,
-                'border-sidebar-border px-3',
-                collapsed ? 'justify-center' : 'gap-1',
+                'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex',
+                collapsed ? 'w-20' : 'w-64',
               )}
             >
-              {collapsed ? (
-                <LogoMark />
-              ) : (
-                <>
-                  <BrandLockup className="min-w-0 flex-1" />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Collapse sidebar"
-                    onClick={toggleSidebar}
-                  >
-                    <PanelLeftCloseIcon className="size-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-            <nav aria-label="Main" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-              {adminNavItems.map(({ to, label, icon: Icon, end }) => (
-                <SidebarLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  label={label}
-                  collapsed={collapsed}
-                  icon={Icon}
-                />
-              ))}
-            </nav>
-            <div className={cn('border-sidebar-border flex h-12 shrink-0 items-center border-t px-3')}>
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full" aria-label="Sign out" onClick={signOut}>
-                      <LogOutIcon className="size-4" />
+              <div
+                className={cn(
+                  HEADER_BAR,
+                  'border-sidebar-border px-3',
+                  collapsed ? 'justify-center' : 'gap-1',
+                )}
+              >
+                {collapsed ? (
+                  <LogoMark />
+                ) : (
+                  <>
+                    <BrandLockup className="min-w-0 flex-1" />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Collapse sidebar"
+                      onClick={toggleSidebar}
+                    >
+                      <PanelLeftCloseIcon className="size-4" />
                     </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Sign out</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
-                  <LogOutIcon className="size-4" />
-                  Sign out
-                </Button>
-              )}
-            </div>
-          </aside>
-
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <AdminTopBar collapsed={collapsed} onExpandSidebar={toggleSidebar} />
-
-            <main className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6">
-                <Outlet />
+                  </>
+                )}
               </div>
-            </main>
+              <nav aria-label="Main" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+                {navItems.map(({ to, label, icon: Icon, end }) => (
+                  <SidebarLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    label={label}
+                    collapsed={collapsed}
+                    icon={Icon}
+                  />
+                ))}
+              </nav>
+            </aside>
 
-            <SiteFooter pinned={false} />
-            <AdminBottomNav pinned={false} />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <AdminTopBar collapsed={collapsed} onExpandSidebar={toggleSidebar} />
+
+              <main className="min-h-0 flex-1 overflow-y-auto">
+                <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6">
+                  <Outlet />
+                </div>
+              </main>
+
+              <div className="bg-sidebar flex h-14 items-center border-t px-4 lg:hidden">
+                <SessionAccountBar className="w-full" />
+              </div>
+              <div className="lg:hidden">
+                <SiteFooter pinned={false} />
+              </div>
+              <AdminBottomNav pinned={false} showMyAccount={showMyAccount} />
+            </div>
+          </div>
+
+          <div className="border-sidebar-border hidden min-h-14 shrink-0 border-t lg:flex">
+            <div
+              className={cn(
+                'bg-sidebar text-sidebar-foreground flex items-center border-r px-3',
+                collapsed ? 'w-20 py-2' : 'w-64',
+              )}
+            >
+              <SessionAccountBar sidebar collapsed={collapsed} className="w-full" />
+            </div>
+            <SiteFooter pinned={false} className="min-h-0 flex-1 border-t-0" />
           </div>
         </div>
       </MenuSearchProvider>
@@ -132,7 +145,6 @@ function AdminTopBar({
   onExpandSidebar: () => void
 }) {
   const chrome = usePageChrome()
-  const signOut = useSessionStore((s) => s.signOut)
 
   return (
     <>
@@ -152,9 +164,6 @@ function AdminTopBar({
           <MenuSearchButton />
           <OfflineBadge />
           <ThemeToggle />
-          <Button variant="ghost" size="icon-sm" aria-label="Sign out" onClick={signOut}>
-            <LogOutIcon className="size-4" />
-          </Button>
         </div>
       </header>
 

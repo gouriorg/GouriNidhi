@@ -2,7 +2,7 @@ import { LayoutDashboardIcon, MenuIcon, UsersIcon, WalletIcon } from 'lucide-rea
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router'
 
-import { adminMoreNavItems } from '@/components/layout/nav-items'
+import { adminMoreNavItems, adminMyAccountItem } from '@/components/layout/nav-items'
 import {
   Sheet,
   SheetContent,
@@ -19,10 +19,17 @@ const primaryTabs = [
 ]
 
 /** Thumb-reach navigation for phones. */
-export function AdminBottomNav({ pinned = true }: { pinned?: boolean }) {
+export function AdminBottomNav({
+  pinned = true,
+  showMyAccount = false,
+}: {
+  pinned?: boolean
+  showMyAccount?: boolean
+}) {
   const [moreOpen, setMoreOpen] = useState(false)
   const { pathname } = useLocation()
-  const moreActive = adminMoreNavItems.some((item) => pathname.startsWith(item.to))
+  const moreItems = showMyAccount ? [...adminMoreNavItems, adminMyAccountItem] : adminMoreNavItems
+  const moreActive = moreItems.some((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
 
   return (
     <nav
@@ -66,7 +73,7 @@ export function AdminBottomNav({ pinned = true }: { pinned?: boolean }) {
               <SheetTitle>More</SheetTitle>
             </SheetHeader>
             <div className="grid gap-1 px-4 pb-2">
-              {adminMoreNavItems.map(({ to, label, icon: Icon }) => (
+              {moreItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
